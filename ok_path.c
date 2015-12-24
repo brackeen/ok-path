@@ -677,8 +677,7 @@ static int num_segments(double x0, double y0, double x1, double y1, double x2, d
     
     if (dist <= 0) {
         num_segments = 1;
-    }
-    else {
+    } else {
         num_segments = MAX(1, 1 << (ilog2((int)lround(dist * 1.5f))));
         num_segments = MIN(num_segments, 16);
     }
@@ -818,5 +817,92 @@ double ok_path_get_length(ok_path *path) {
         return flattened_segments[path->flattened_segments.length - 1].length_to;
     } else {
         return 0.0;
+    }
+}
+
+static double wrap_to_plus_minus_pi(const double radians) {
+    if (radians < -M_PI || radians > M_PI) {
+        // Transform range to (0 to 1)
+        double new_angle = (radians + M_PI) / (2 * M_PI);
+        new_angle -= floor(new_angle);
+        // Transform back to (-pi to pi) range
+        return (M_PI * (new_angle * 2 - 1));
+    } else {
+        return radians;
+    }
+}
+
+static double shortest_arc(const double from_radians, const double to_radians) {
+    const double from_value = wrap_to_plus_minus_pi(from_radians);
+    const double to_value = wrap_to_plus_minus_pi(to_radians);
+    const double d1 = to_value - from_value;
+    const double d2 = from_value - to_value + 2 * M_PI;
+    if (fabs(d1) < fabs(d2)) {
+        return d1;
+    } else {
+        return d2;
+    }
+}
+
+void ok_path_get_location(ok_path *path, const double p, double *x, double *y, double *angle) {
+    ok_path_flatten_if_needed(path);
+    const unsigned int count = path->flattened_segments.length;
+    if (count == 0) {
+        *x = 0;
+        *y = 0;
+        *angle = 0;
+    } else {
+        ok_path_flattened_segment *flattened_segments = path->flattened_segments.values;
+        const double length = flattened_segments[count - 1].length_to;
+        unsigned int p_low;
+        unsigned int p_high;
+        if (p <= 0.0) {
+            p_low = 0;
+            p_high = MIN(1, count - 1);
+        } else if (p >= 1.0) {
+            p_low = count - 1;
+            p_high = count - 1;
+        } else {
+            // Binary search
+            const double l = p * length;
+            p_low = 0;
+            p_high = count - 1;
+            while (p_high - p_low > 1) {
+                unsigned int index = (p_high + p_low) / 2;
+                if (flattened_segments[index].length_to > l) {
+                    p_high = index;
+                } else {
+                    p_low = index;
+                }
+            }
+        }
+        
+        ok_path_flattened_segment *s1 = &flattened_segments[p_low];
+        ok_path_flattened_segment *s2 = &flattened_segments[p_high];
+        if (p_low == p_high || length == 0) {
+            *x = s1->x;
+            *y = s1->y;
+            *angle = s2->angle_to;
+        } else {
+            const double p1 = s1->length_to / length;
+            const double p2 = s2->length_to / length;
+            
+            if (p1 == p2) {
+                *x = s1->x;
+                *y = s1->y;
+                *angle = s2->angle_to;
+            } else {
+                *x = s1->x + (s2->x - s1->x) * (p - p1) / (p2 - p1);
+                *y = s1->y + (s2->y - s1->y) * (p - p1) / (p2 - p1);
+                if (s1->type == MOVE_TO || s2->type != CURVE_TO) {
+                    *angle = s2->angle_to;
+                } else {
+                    const double angle1 = s1->angle_to;
+                    const double angle2 = s2->angle_to;
+                    const double d_angle = shortest_arc(angle1, angle2);
+                    *angle = angle1 + d_angle * (p - p1) / (p2 - p1);
+                }
+            }
+        }
     }
 }

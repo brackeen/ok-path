@@ -66,6 +66,10 @@ extern "C" {
     /// Gets the length of the path. First, the path is flattened if it hasn't been flattened yet.
     double ok_path_get_length(ok_path *path);
     
+    /// Gets the location on the path at location p, where p is from 0 to 1.
+    /// First, the path is flattened if it hasn't been flattened yet.
+    void ok_path_get_location(ok_path *path, const double p, double *x, double *y, double *angle);
+    
 #ifdef __cplusplus
 }
 #endif
