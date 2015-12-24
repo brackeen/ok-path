@@ -61,6 +61,11 @@ extern "C" {
 
     void ok_path_close(ok_path *path);
     
+    // MARK: Path querying and flattening
+    
+    /// Gets the length of the path. First, the path is flattened if it hasn't been flattened yet.
+    double ok_path_get_length(ok_path *path);
+    
 #ifdef __cplusplus
 }
 #endif

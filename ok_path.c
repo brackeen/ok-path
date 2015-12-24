@@ -31,7 +31,7 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #endif
 
-// MARK: vector
+// MARK: Vector
 
 typedef struct {
     void *values;
@@ -64,7 +64,7 @@ static void ok_vector_free(ok_vector *list) {
     }
 }
 
-// MARK: path
+// MARK: Path
 
 typedef enum {
     MOVE_TO = 0,
@@ -81,10 +81,28 @@ typedef struct {
     double cx2, cy2;
 } ok_path_segment;
 
+typedef struct {
+    // The type of command this line segment originated from.
+    ok_path_type type;
+    
+    // Point location.
+    double x, y;
+    
+    // Entire length of the path up to this point.
+    double length_to;
+    
+    // Angle from previous point to this point.
+    double angle_to;
+} ok_path_flattened_segment;
+
 struct ok_path {
     ok_vector path_segments;
     double subpath_origin_x;
     double subpath_origin_y;
+    
+    // Flattened path
+    ok_vector flattened_segments;
+    unsigned int num_segments_flattened;
 };
 
 ok_path *ok_path_alloc() {
@@ -139,7 +157,7 @@ static double ok_path_last_y(const ok_path *path) {
     }
 }
 
-// MARK: Commands
+// MARK: Path creation
 
 void ok_path_move_to(ok_path *path, const double x, const double y) {
     if (ok_vector_ensure_capacity(&path->path_segments, sizeof(ok_path_segment), 1)) {
@@ -343,7 +361,7 @@ void ok_path_elliptical_arc_to(ok_path *path, const double radius_x, const doubl
     }
 }
 
-// MARK: SVG parsing
+// MARK: SVG path parsing
 
 static const char * const SVG_COMMANDS = "MmLlHhVvAaQqTtCcSsZz";
 static const unsigned int SVG_COMMAND_VALUES[] = { 2, 2, 2, 2, 1, 1, 1, 1, 7, 7, 4, 4, 2, 2, 6, 6, 4, 4, 0, 0 };
@@ -589,4 +607,216 @@ bool ok_path_append_svg(ok_path *path, const char *svg_path, char **error) {
         }
     }
     return (str != NULL);
+}
+
+// MARK: Path flattening
+
+static void ok_path_add_flattened_segment(ok_path *path, const ok_path_type type, const double x, const double y) {
+    double dx;
+    double dy;
+    double prev_length;
+    if (path->flattened_segments.length == 0) {
+        dx = x;
+        dy = y;
+        prev_length = 0;
+    } else {
+        ok_path_flattened_segment *flattened_segments = path->flattened_segments.values;
+        ok_path_flattened_segment *flattened_segment = &flattened_segments[path->flattened_segments.length - 1];
+        dx = x - flattened_segment->x;
+        dy = y - flattened_segment->y;
+        prev_length = flattened_segment->length_to;
+    }
+    
+    if (ok_vector_ensure_capacity(&path->flattened_segments, sizeof(ok_path_flattened_segment), 1)) {
+        ok_path_flattened_segment *flattened_segments = path->flattened_segments.values;
+        ok_path_flattened_segment *flattened_segment = &flattened_segments[path->flattened_segments.length++];
+        flattened_segment->type = type;
+        flattened_segment->x = x;
+        flattened_segment->y = y;
+        flattened_segment->angle_to = atan2(dy, dx);
+        if (type == MOVE_TO) {
+            flattened_segment->length_to = prev_length;
+        } else {
+            flattened_segment->length_to = prev_length + sqrt(dx * dx + dy * dy);
+        }
+    }
+}
+
+static double approx_dist(double px, double py, double ax, double ay, double bx, double by) {
+    // Distance from a point to a line approximation. From Graphics Gems II, page 11.
+    double dx = fabs(bx - ax);
+    double dy = fabs(by - ay);
+    
+    double div = dx + dy - fmin(dx, dy) / 2.0;
+    
+    if (div == 0) {
+        return 0;
+    }
+    
+    double a2 = (py - ay) * (bx - ax) - (px - ax) * (by - ay);
+    
+    return fabs(a2) / div;
+}
+
+static int ilog2(int n) {
+    int count = 0;
+    while (true) {
+        n >>= 1;
+        if (n == 0) {
+            return count;
+        }
+        count++;
+    }
+}
+
+static int num_segments(double x0, double y0, double x1, double y1, double x2, double y2, double x3, double y3) {
+    int num_segments;
+    
+    double dist = fmax(approx_dist(x1, y1, x0, y0, x3, y3),
+                       approx_dist(x2, y2, x0, y0, x3, y3));
+    
+    if (dist <= 0) {
+        num_segments = 1;
+    }
+    else {
+        num_segments = MAX(1, 1 << (ilog2((int)lround(dist * 1.5f))));
+        num_segments = MIN(num_segments, 16);
+    }
+    
+    return num_segments;
+}
+
+static void ok_path_to_line_segments(ok_path *path, const int num_segments,
+                                     const double x0, const double y0, const double x1, const double y1,
+                                     const double x2, const double y2, const double x3, const double y3) {
+    const double t = 1.0 / num_segments;
+    const double t2 = t * t;
+    const double t3 = t2 * t;
+    
+    double xf = x0;
+    double xfd = 3 * (x1 - x0) * t;
+    double xfdd2 = 3 * (x0 - 2 * x1 + x2) * t2;
+    double xfddd6 = (3 * (x1 - x2) + x3 - x0) * t3;
+    double xfddd2 = 3 * xfddd6;
+    double xfdd = 2 * xfdd2;
+    double xfddd = 2 * xfddd2;
+    
+    double yf = y0;
+    double yfd = 3 * (y1 - y0) * t;
+    double yfdd2 = 3 * (y0 - 2 * y1 + y2) * t2;
+    double yfddd6 = (3 * (y1 - y2) + y3 - y0) * t3;
+    double yfddd2 = 3 * yfddd6;
+    double yfdd = 2 * yfdd2;
+    double yfddd = 2 * yfddd2;
+    
+    for (int i = 1; i < num_segments; i++) {
+        xf += xfd + xfdd2 + xfddd6;
+        xfd += xfdd + xfddd2;
+        xfdd += xfddd;
+        xfdd2 += xfddd2;
+        
+        yf += yfd + yfdd2 + yfddd6;
+        yfd += yfdd + yfddd2;
+        yfdd += yfddd;
+        yfdd2 += yfddd2;
+        
+        ok_path_add_flattened_segment(path, CURVE_TO, xf, yf);
+    }
+    
+    ok_path_add_flattened_segment(path, CURVE_TO, x3, y3);
+}
+
+static void ok_path_flatten_curve_to(ok_path *path, const double x1, const double y1, const double x2, const double y2,
+                                     const double x3, const double y3, const double x4, const double y4) {
+    // First division
+    const double x12 = (x1 + x2) / 2;
+    const double y12 = (y1 + y2) / 2;
+    const double x23 = (x2 + x3) / 2;
+    const double y23 = (y2 + y3) / 2;
+    const double x34 = (x3 + x4) / 2;
+    const double y34 = (y3 + y4) / 2;
+    const double x123 = (x12 + x23) / 2;
+    const double y123 = (y12 + y23) / 2;
+    const double x234 = (x23 + x34) / 2;
+    const double y234 = (y23 + y34) / 2;
+    const double x1234 = (x123 + x234) / 2;
+    const double y1234 = (y123 + y234) / 2;
+    
+    // Left division
+    const double lx12 = (x1 + x12) / 2;
+    const double ly12 = (y1 + y12) / 2;
+    const double lx23 = (x12 + x123) / 2;
+    const double ly23 = (y12 + y123) / 2;
+    const double lx34 = (x123 + x1234) / 2;
+    const double ly34 = (y123 + y1234) / 2;
+    const double lx123 = (lx12 + lx23) / 2;
+    const double ly123 = (ly12 + ly23) / 2;
+    const double lx234 = (lx23 + lx34) / 2;
+    const double ly234 = (ly23 + ly34) / 2;
+    const double lx1234 = (lx123 + lx234) / 2;
+    const double ly1234 = (ly123 + ly234) / 2;
+    
+    // Right division
+    const double rx12 = (x1234 + x234) / 2;
+    const double ry12 = (y1234 + y234) / 2;
+    const double rx23 = (x234 + x34) / 2;
+    const double ry23 = (y234 + y34) / 2;
+    const double rx34 = (x34 + x4) / 2;
+    const double ry34 = (y34 + y4) / 2;
+    const double rx123 = (rx12 + rx23) / 2;
+    const double ry123 = (ry12 + ry23) / 2;
+    const double rx234 = (rx23 + rx34) / 2;
+    const double ry234 = (ry23 + ry34) / 2;
+    const double rx1234 = (rx123 + rx234) / 2;
+    const double ry1234 = (ry123 + ry234) / 2;
+    
+    // Determine the number of segments for each division
+    const int num_segments1 = num_segments(x1, y1, lx12, ly12, lx123, ly123, lx1234, ly1234);
+    const int num_segments2 = num_segments(lx1234, ly1234, lx234, ly234, lx34, ly34, x1234, y1234);
+    const int num_segments3 = num_segments(x1234, y1234, rx12, ry12, rx123, ry123, rx1234, ry1234);
+    const int num_segments4 = num_segments(rx1234, ry1234, rx234, ry234, rx34, ry34, x4, y4);
+    
+    // Convert to lines
+    ok_path_to_line_segments(path, num_segments1, x1, y1, lx12, ly12, lx123, ly123, lx1234, ly1234);
+    ok_path_to_line_segments(path, num_segments2, lx1234, ly1234, lx234, ly234, lx34, ly34, x1234, y1234);
+    ok_path_to_line_segments(path, num_segments3, x1234, y1234, rx12, ry12, rx123, ry123, rx1234, ry1234);
+    ok_path_to_line_segments(path, num_segments4, rx1234, ry1234, rx234, ry234, rx34, ry34, x4, y4);
+}
+
+static void ok_path_flatten_if_needed(ok_path *path) {
+    while (path->path_segments.length > path->num_segments_flattened) {
+        ok_path_segment *segments = path->path_segments.values;
+        ok_path_segment *segment = &segments[path->num_segments_flattened];
+        if (segment->type != CURVE_TO) {
+            ok_path_add_flattened_segment(path, segment->type, segment->x, segment->y);
+        } else {
+            double x;
+            double y;
+            if (path->flattened_segments.length == 0) {
+                x = 0;
+                y = 0;
+            } else {
+                ok_path_flattened_segment *flattened_segments = path->flattened_segments.values;
+                ok_path_flattened_segment *flattened_segment = &flattened_segments[path->flattened_segments.length - 1];
+                x = flattened_segment->x;
+                y = flattened_segment->y;
+            }
+            ok_path_flatten_curve_to(path, x, y, segment->cx1, segment->cy1, segment->cx2, segment->cy2,
+                                     segment->x, segment->y);
+        }
+        
+        path->num_segments_flattened++;
+    }
+}
+
+// MARK: Path querying
+
+double ok_path_get_length(ok_path *path) {
+    ok_path_flatten_if_needed(path);
+    if (path->flattened_segments.length > 0) {
+        ok_path_flattened_segment *flattened_segments = path->flattened_segments.values;
+        return flattened_segments[path->flattened_segments.length - 1].length_to;
+    } else {
+        return 0.0;
+    }
 }

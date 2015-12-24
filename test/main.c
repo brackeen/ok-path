@@ -50,6 +50,13 @@ static int test_svg_parse() {
         return 1;
     }
     
+    if (ok_path_get_length(path1) != ok_path_get_length(path2)) {
+        printf("Failure: Path lengths not equal\n");
+        ok_path_free(path1);
+        ok_path_free(path2);
+        return 1;
+    }
+    
     printf("Success\n");
     ok_path_free(path1);
     ok_path_free(path2);
