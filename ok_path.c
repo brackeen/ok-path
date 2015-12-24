@@ -111,6 +111,7 @@ ok_path *ok_path_alloc() {
 
 void ok_path_free(ok_path *path) {
     ok_vector_free(&path->path_segments);
+    ok_vector_free(&path->flattened_segments);
     free(path);
 }
 
