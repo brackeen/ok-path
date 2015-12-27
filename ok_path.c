@@ -96,6 +96,7 @@ typedef struct {
 } ok_path_flattened_segment;
 
 struct ok_path {
+    // Path segments normalized to contain only MOVE_TO, LINE_TO, and cubic bezier CURVE_TO segments.
     ok_vector path_segments;
     double subpath_origin_x;
     double subpath_origin_y;
@@ -158,7 +159,7 @@ static double ok_path_last_y(const ok_path *path) {
     }
 }
 
-// MARK: Path creation
+// MARK: Modifying paths
 
 void ok_path_move_to(ok_path *path, const double x, const double y) {
     if (ok_vector_ensure_capacity(&path->path_segments, sizeof(ok_path_segment), 1)) {
@@ -197,7 +198,7 @@ void ok_path_curve_to(ok_path *path, const double cx1, const double cy1, const d
     }
 }
 
-void ok_path_append(ok_path *path, ok_path *path_to_append) {
+void ok_path_append(ok_path *path, const ok_path *path_to_append) {
     unsigned int count = path_to_append->path_segments.length;
     if (ok_vector_ensure_capacity(&path->path_segments, sizeof(ok_path_segment), count)) {
         ok_path_segment *values = path->path_segments.values;
@@ -371,7 +372,7 @@ static const char * const SVG_WHITESPACE_OR_COMMA = ", \t\r\n";
 
 static char SVG_ERROR_MESSAGE[80];
 
-bool ok_path_append_svg(ok_path *path, const char *svg_path, char **error) {
+bool ok_path_append_svg(ok_path *path, const char *svg_path, char **out_error_message) {
     const char *str = svg_path;
     double values[7];
     char last_command = 0;
@@ -380,8 +381,8 @@ bool ok_path_append_svg(ok_path *path, const char *svg_path, char **error) {
     double curr_x = 0, curr_y = 0;
     double control_x = 0, control_y = 0;
     
-    if (!str && error) {
-        *error = "NULL input";
+    if (!str && out_error_message) {
+        *out_error_message = "svg_path is NULL";
     }
     
     while (str && *str) {
@@ -412,10 +413,10 @@ bool ok_path_append_svg(ok_path *path, const char *svg_path, char **error) {
                         char *endptr;
                         values[count++] = strtod(str, &endptr);
                         if (str == endptr) {
-                            if (error) {
+                            if (out_error_message) {
                                 snprintf(SVG_ERROR_MESSAGE, sizeof(SVG_ERROR_MESSAGE),
                                          "Could not parse number at position: %li", str - svg_path);
-                                *error = SVG_ERROR_MESSAGE;
+                                *out_error_message = SVG_ERROR_MESSAGE;
                             }
                             return false;
                         }
@@ -423,10 +424,10 @@ bool ok_path_append_svg(ok_path *path, const char *svg_path, char **error) {
                     }
                 }
                 if (count < values_required) {
-                    if (error) {
+                    if (out_error_message) {
                         snprintf(SVG_ERROR_MESSAGE, sizeof(SVG_ERROR_MESSAGE),
                                  "Unexpected EOF: Needed %i more numbers", (values_required - count));
-                        *error = SVG_ERROR_MESSAGE;
+                        *out_error_message = SVG_ERROR_MESSAGE;
                     }
                     return false;
                 }
@@ -594,10 +595,10 @@ bool ok_path_append_svg(ok_path *path, const char *svg_path, char **error) {
                     break;
                 }
                 default: {
-                    if (error) {
+                    if (out_error_message) {
                         snprintf(SVG_ERROR_MESSAGE, sizeof(SVG_ERROR_MESSAGE),
                                  "Invalid SVG command %c at position %li", command, (str-svg_path));
-                        *error = SVG_ERROR_MESSAGE;
+                        *out_error_message = SVG_ERROR_MESSAGE;
                     }
                     return false;
                 }
@@ -845,13 +846,19 @@ static double shortest_arc(const double from_radians, const double to_radians) {
     }
 }
 
-void ok_path_get_location(ok_path *path, const double p, double *x, double *y, double *angle) {
+void ok_path_get_location(ok_path *path, const double p, double *out_x, double *out_y, double *out_angle) {
     ok_path_flatten_if_needed(path);
     const unsigned int count = path->flattened_segments.length;
     if (count == 0) {
-        *x = 0;
-        *y = 0;
-        *angle = 0;
+        if (out_x) {
+            *out_x = 0;
+        }
+        if (out_y) {
+            *out_y = 0;
+        }
+        if (out_angle) {
+            *out_angle = 0;
+        }
     } else {
         ok_path_flattened_segment *flattened_segments = path->flattened_segments.values;
         const double length = flattened_segments[count - 1].length_to;
@@ -881,27 +888,45 @@ void ok_path_get_location(ok_path *path, const double p, double *x, double *y, d
         ok_path_flattened_segment *s1 = &flattened_segments[p_low];
         ok_path_flattened_segment *s2 = &flattened_segments[p_high];
         if (p_low == p_high || length == 0) {
-            *x = s1->x;
-            *y = s1->y;
-            *angle = s2->angle_to;
+            if (out_x) {
+                *out_x = s1->x;
+            }
+            if (out_y) {
+                *out_y = s1->y;
+            }
+            if (out_angle) {
+                *out_angle = s2->angle_to;
+            }
         } else {
             const double p1 = s1->length_to / length;
             const double p2 = s2->length_to / length;
             
             if (p1 == p2) {
-                *x = s1->x;
-                *y = s1->y;
-                *angle = s2->angle_to;
+                if (out_x) {
+                    *out_x = s1->x;
+                }
+                if (out_y) {
+                    *out_y = s1->y;
+                }
+                if (out_angle) {
+                    *out_angle = s2->angle_to;
+                }
             } else {
-                *x = s1->x + (s2->x - s1->x) * (p - p1) / (p2 - p1);
-                *y = s1->y + (s2->y - s1->y) * (p - p1) / (p2 - p1);
-                if (s1->type == MOVE_TO || s2->type != CURVE_TO) {
-                    *angle = s2->angle_to;
-                } else {
-                    const double angle1 = s1->angle_to;
-                    const double angle2 = s2->angle_to;
-                    const double d_angle = shortest_arc(angle1, angle2);
-                    *angle = angle1 + d_angle * (p - p1) / (p2 - p1);
+                if (out_x) {
+                    *out_x = s1->x + (s2->x - s1->x) * (p - p1) / (p2 - p1);
+                }
+                if (out_y) {
+                    *out_y = s1->y + (s2->y - s1->y) * (p - p1) / (p2 - p1);
+                }
+                if (out_angle) {
+                    if (s1->type == MOVE_TO || s2->type != CURVE_TO) {
+                        *out_angle = s2->angle_to;
+                    } else {
+                        const double angle1 = s1->angle_to;
+                        const double angle2 = s2->angle_to;
+                        const double d_angle = shortest_arc(angle1, angle2);
+                        *out_angle = angle1 + d_angle * (p - p1) / (p2 - p1);
+                    }
                 }
             }
         }
