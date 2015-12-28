@@ -225,6 +225,10 @@ void ok_path_quad_curve_to(ok_path *path, const double cx, const double cy, cons
     ok_path_curve_to(path, cx1, cy1, cx2, cy2, x, y);
 }
 
+void ok_path_arc_to(ok_path *path, double radius, bool large_arc, bool sweep, double x, double y) {
+    ok_path_elliptical_arc_to(path, radius, radius, 0.0, large_arc, sweep, x, y);
+}
+
 void ok_path_elliptical_arc_to(ok_path *path, const double radius_x, const double radius_y,
                                const double rotation_radians, const bool large_arc, const bool sweep,
                                const double x, const double y) {
@@ -325,7 +329,7 @@ void ok_path_elliptical_arc_to(ok_path *path, const double radius_x, const doubl
             double alpha = 4.0 * tan(da / 4.0) / 3.0;
             
             // Alternative alpha from: http://www.spaceroots.org/documents/ellipse/
-            // TODO: test for very large arcs to see which alpha is better
+            // XXX: test for very large arcs to see which alpha is better
             //double t = tan(da / 2.0);
             //double alpha = sin(da) * (fsqrt(4.0 + 3.0 * t * t) - 1.0) / 3.0;
             
