@@ -1,4 +1,4 @@
-CC = clang -Wall -g -std=c99 -Wdocumentation -Wdocumentation-unknown-command
+CC = clang -Wall -Wextra -Wdocumentation -Wdocumentation-unknown-command -g -std=c99
 BIN = ./bin
 INCLUDES = -I .. 
 FILES = *.c ../*.c
