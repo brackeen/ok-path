@@ -5,8 +5,8 @@
 #include <string.h>
 
 static int test_svg_parse() {
-    ok_path *path1 = ok_path_alloc();
-    ok_path *path2 = ok_path_alloc();
+    ok_path_t *path1 = ok_path_alloc();
+    ok_path_t *path2 = ok_path_alloc();
     char *error;
 
     // Test if the SVG path is identical to the programatically constructed path.

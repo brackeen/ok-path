@@ -30,22 +30,22 @@ extern "C" {
 #endif
 
 /**
- * An `ok_path` is a series of line segments and Bézier curves.
+ * An `ok_path_t` is a series of line segments and Bézier curves.
  */
-typedef struct ok_path ok_path;
+typedef struct ok_path ok_path_t;
 
 // MARK: Creating paths
 
 /**
- * Creates a new #ok_path.
- * The path should be freed with #ok_path_free(ok_path *).
+ * Creates a new #ok_path_t.
+ * The path should be freed with #ok_path_free(ok_path_t *).
  */
-ok_path *ok_path_alloc(void);
+ok_path_t *ok_path_alloc(void);
 
 /**
- * Frees an #ok_path.
+ * Frees an #ok_path_t.
  */
-void ok_path_free(ok_path *path);
+void ok_path_free(ok_path_t *path);
 
 // MARK: Modifying paths
 
@@ -56,7 +56,7 @@ void ok_path_free(ok_path *path);
  * @param x The x location to move to.
  * @param y The y location to move to.
  */
-void ok_path_move_to(ok_path *path, double x, double y);
+void ok_path_move_to(ok_path_t *path, double x, double y);
 
 /**
  * Adds a line segment to the path.
@@ -65,7 +65,7 @@ void ok_path_move_to(ok_path *path, double x, double y);
  * @param x The x location of the end point of the line segment.
  * @param y The y location of the end point of the line segment.
  */
-void ok_path_line_to(ok_path *path, double x, double y);
+void ok_path_line_to(ok_path_t *path, double x, double y);
 
 /**
  * Adds a cubic Bézier curve to the path.
@@ -78,7 +78,7 @@ void ok_path_line_to(ok_path *path, double x, double y);
  * @param x The x location of the end point of the curve.
  * @param y The y location of the end point of the curve.
  */
-void ok_path_curve_to(ok_path *path, double cx1, double cy1, double cx2, double cy2,
+void ok_path_curve_to(ok_path_t *path, double cx1, double cy1, double cx2, double cy2,
                       double x, double y);
 
 /**
@@ -90,7 +90,7 @@ void ok_path_curve_to(ok_path *path, double cx1, double cy1, double cx2, double 
  * @param x The x location of the end point of the curve.
  * @param y The y location of the end point of the curve.
  */
-void ok_path_quad_curve_to(ok_path *path, double cx, double cy, double x, double y);
+void ok_path_quad_curve_to(ok_path_t *path, double cx, double cy, double x, double y);
 
 /**
  * Adds an arc to the path.
@@ -103,7 +103,7 @@ void ok_path_quad_curve_to(ok_path *path, double cx, double cy, double x, double
  * @param y The y location of the end point of the arc.
  * @see http://www.w3.org/TR/SVG/paths.html#PathDataEllipticalArcCommands
  */
-void ok_path_arc_to(ok_path *path, double radius, bool large_arc, bool sweep, double x, double y);
+void ok_path_arc_to(ok_path_t *path, double radius, bool large_arc, bool sweep, double x, double y);
 
 /**
  * Adds an elliptical arc to the path.
@@ -118,7 +118,7 @@ void ok_path_arc_to(ok_path *path, double radius, bool large_arc, bool sweep, do
  * @param y The y location of the end point of the arc.
  * @see http://www.w3.org/TR/SVG/paths.html#PathDataEllipticalArcCommands
  */
-void ok_path_elliptical_arc_to(ok_path *path, double radius_x, double radius_y,
+void ok_path_elliptical_arc_to(ok_path_t *path, double radius_x, double radius_y,
                                double rotation_radians, bool large_arc, bool sweep,
                                double x, double y);
 
@@ -127,27 +127,26 @@ void ok_path_elliptical_arc_to(ok_path *path, double radius_x, double radius_y,
  * @param path The path.
  * @param path_to_append The path to append.
  */
-void ok_path_append(ok_path *path, const ok_path *path_to_append);
+void ok_path_append(ok_path_t *path, const ok_path_t *path_to_append);
 
 /**
  * Appends an SVG path, like "M 100,100 L 200,100 200,200 100,200 Z".
  * The entire specification defined at http://www.w3.org/TR/SVG/paths.html is accepted.
  *
  * If successful, returns `true`. Otherwise, returns `false` and `out_error_message` is set to an
- * error string.
- * The error string is maintained internally and should not be freed.
+ * error string. The error string is maintained internally and should not be freed.
  *
  * @param path The path.
  * @param svg_path The SVG path string to parse.
  * @param[out] out_error_message The pointer where the error string should be stored. May be `NULL`.
  * @return `true` if successful.
  */
-bool ok_path_append_svg(ok_path *path, const char *svg_path, char **out_error_message);
+bool ok_path_append_svg(ok_path_t *path, const char *svg_path, char **out_error_message);
 
 /**
  * Closes the current subpath.
  */
-void ok_path_close(ok_path *path);
+void ok_path_close(ok_path_t *path);
 
 // MARK: Getting information about paths
 
@@ -156,13 +155,13 @@ void ok_path_close(ok_path *path);
  *
  * @return `true` if both paths contain the same sequence of path segments.
  */
-bool ok_path_equals(const ok_path *path1, const ok_path *path2);
+bool ok_path_equals(const ok_path_t *path1, const ok_path_t *path2);
 
 /**
  * Gets the length of the path.
  * The path is flattened if it has not been flattened yet.
  */
-double ok_path_get_length(ok_path *path);
+double ok_path_get_length(ok_path_t *path);
 
 /**
  * Gets the location on the path at location `p`, where `p` is a value from 0.0 to 1.0.
@@ -174,7 +173,8 @@ double ok_path_get_length(ok_path *path);
  * @param[out] out_y The pointer where the y location should be stored. May be `NULL`.
  * @param[out] out_angle The pointer where the angle, in radians, should be stored. May be `NULL`.
  */
-void ok_path_get_location(ok_path *path, double p, double *out_x, double *out_y, double *out_angle);
+void ok_path_get_location(ok_path_t *path, double p, double *out_x, double *out_y,
+                          double *out_angle);
 
 #ifdef __cplusplus
 }

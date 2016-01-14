@@ -34,18 +34,33 @@
 
 // MARK: Vector
 
-typedef struct {
+struct vector {
     void *values;
     size_t length;
     size_t capacity;
-} ok_vector;
+};
 
-static bool ok_vector_ensure_capacity(ok_vector *list, const size_t element_size,
-                                      const size_t additional_count) {
+static void vector_init(struct vector *list) {
+    if (list) {
+        list->values = NULL;
+        list->length = 0;
+        list->capacity = 0;
+    }
+}
+
+static void vector_free(struct vector *list) {
+    if (list && list->values) {
+        free(list->values);
+        vector_init(list);
+    }
+}
+
+static bool vector_ensure_capacity(struct vector *list, const size_t element_size,
+                                   const size_t additional_count) {
     if (list) {
         if (!list->values || list->length + additional_count > list->capacity) {
             const size_t new_capacity =
-                MAX(16, MAX(list->length + additional_count, list->capacity << 1));
+                MAX(8, MAX(list->length + additional_count, list->capacity << 1));
             void *new_data = realloc(list->values, element_size * new_capacity);
             if (!new_data) {
                 return false;
@@ -58,35 +73,26 @@ static bool ok_vector_ensure_capacity(ok_vector *list, const size_t element_size
     return false;
 }
 
-static void ok_vector_free(ok_vector *list) {
-    if (list && list->values) {
-        free(list->values);
-        list->values = NULL;
-        list->length = 0;
-        list->capacity = 0;
-    }
-}
-
 // MARK: Path
 
-typedef enum {
+enum ok_path_type {
     MOVE_TO = 0,
     LINE_TO,
     CURVE_TO,
-} ok_path_type;
+};
 
-typedef struct {
-    ok_path_type type;
+struct ok_path_segment {
+    enum ok_path_type type;
     double x, y;
 
     // Control points. Valid if type is CURVE_TO, otherwise these are undefined.
     double cx1, cy1;
     double cx2, cy2;
-} ok_path_segment;
+};
 
-typedef struct {
+struct ok_path_flattened_segment {
     // The type of command this line segment originated from.
-    ok_path_type type;
+    enum ok_path_type type;
 
     // Point location.
     double x, y;
@@ -96,36 +102,36 @@ typedef struct {
 
     // Angle from previous point to this point.
     double angle_to;
-} ok_path_flattened_segment;
+};
 
 struct ok_path {
     // Path segments normalized to contain only MOVE_TO, LINE_TO, and cubic bezier CURVE_TO
     // segments.
-    ok_vector path_segments;
+    struct vector path_segments;
     double subpath_origin_x;
     double subpath_origin_y;
 
     // Flattened path
-    ok_vector flattened_segments;
+    struct vector flattened_segments;
     unsigned int num_segments_flattened;
 };
 
-ok_path *ok_path_alloc() {
-    return calloc(1, sizeof(ok_path));
+ok_path_t *ok_path_alloc() {
+    return calloc(1, sizeof(ok_path_t));
 }
 
-void ok_path_free(ok_path *path) {
-    ok_vector_free(&path->path_segments);
-    ok_vector_free(&path->flattened_segments);
+void ok_path_free(ok_path_t *path) {
+    vector_free(&path->path_segments);
+    vector_free(&path->flattened_segments);
     free(path);
 }
 
-bool ok_path_equals(const ok_path *path1, const ok_path *path2) {
+bool ok_path_equals(const ok_path_t *path1, const ok_path_t *path2) {
     if (path1->path_segments.length != path2->path_segments.length) {
         return false;
     }
-    ok_path_segment *segment1 = path1->path_segments.values;
-    ok_path_segment *segment2 = path2->path_segments.values;
+    struct ok_path_segment *segment1 = path1->path_segments.values;
+    struct ok_path_segment *segment2 = path2->path_segments.values;
     for (unsigned int i = 0; i < path1->path_segments.length; i++) {
         if (segment1->type != segment2->type) {
             return false;
@@ -145,18 +151,18 @@ bool ok_path_equals(const ok_path *path1, const ok_path *path2) {
     return true;
 }
 
-static double ok_path_last_x(const ok_path *path) {
+static double ok_path_last_x(const ok_path_t *path) {
     if (path->path_segments.length) {
-        ok_path_segment *values = path->path_segments.values;
+        struct ok_path_segment *values = path->path_segments.values;
         return values[path->path_segments.length - 1].x;
     } else {
         return 0;
     }
 }
 
-static double ok_path_last_y(const ok_path *path) {
+static double ok_path_last_y(const ok_path_t *path) {
     if (path->path_segments.length) {
-        ok_path_segment *values = path->path_segments.values;
+        struct ok_path_segment *values = path->path_segments.values;
         return values[path->path_segments.length - 1].y;
     } else {
         return 0;
@@ -165,10 +171,10 @@ static double ok_path_last_y(const ok_path *path) {
 
 // MARK: Modifying paths
 
-void ok_path_move_to(ok_path *path, const double x, const double y) {
-    if (ok_vector_ensure_capacity(&path->path_segments, sizeof(ok_path_segment), 1)) {
-        ok_path_segment *values = path->path_segments.values;
-        ok_path_segment *segment = &values[path->path_segments.length++];
+void ok_path_move_to(ok_path_t *path, const double x, const double y) {
+    if (vector_ensure_capacity(&path->path_segments, sizeof(struct ok_path_segment), 1)) {
+        struct ok_path_segment *values = path->path_segments.values;
+        struct ok_path_segment *segment = &values[path->path_segments.length++];
         segment->type = MOVE_TO;
         segment->x = x;
         segment->y = y;
@@ -177,21 +183,21 @@ void ok_path_move_to(ok_path *path, const double x, const double y) {
     }
 }
 
-void ok_path_line_to(ok_path *path, const double x, const double y) {
-    if (ok_vector_ensure_capacity(&path->path_segments, sizeof(ok_path_segment), 1)) {
-        ok_path_segment *values = path->path_segments.values;
-        ok_path_segment *segment = &values[path->path_segments.length++];
+void ok_path_line_to(ok_path_t *path, const double x, const double y) {
+    if (vector_ensure_capacity(&path->path_segments, sizeof(struct ok_path_segment), 1)) {
+        struct ok_path_segment *values = path->path_segments.values;
+        struct ok_path_segment *segment = &values[path->path_segments.length++];
         segment->type = LINE_TO;
         segment->x = x;
         segment->y = y;
     }
 }
 
-void ok_path_curve_to(ok_path *path, const double cx1, const double cy1,
+void ok_path_curve_to(ok_path_t *path, const double cx1, const double cy1,
                       const double cx2, const double cy2, const double x, const double y) {
-    if (ok_vector_ensure_capacity(&path->path_segments, sizeof(ok_path_segment), 1)) {
-        ok_path_segment *values = path->path_segments.values;
-        ok_path_segment *segment = &values[path->path_segments.length++];
+    if (vector_ensure_capacity(&path->path_segments, sizeof(struct ok_path_segment), 1)) {
+        struct ok_path_segment *values = path->path_segments.values;
+        struct ok_path_segment *segment = &values[path->path_segments.length++];
         segment->type = CURVE_TO;
         segment->x = x;
         segment->y = y;
@@ -202,24 +208,24 @@ void ok_path_curve_to(ok_path *path, const double cx1, const double cy1,
     }
 }
 
-void ok_path_append(ok_path *path, const ok_path *path_to_append) {
+void ok_path_append(ok_path_t *path, const ok_path_t *path_to_append) {
     size_t count = path_to_append->path_segments.length;
-    if (ok_vector_ensure_capacity(&path->path_segments, sizeof(ok_path_segment), count)) {
-        ok_path_segment *values = path->path_segments.values;
-        ok_path_segment *src_values = path_to_append->path_segments.values;
-        ok_path_segment *dst_values = &values[path->path_segments.length];
-        memcpy(dst_values, src_values, count * sizeof(ok_path_segment));
+    if (vector_ensure_capacity(&path->path_segments, sizeof(struct ok_path_segment), count)) {
+        struct ok_path_segment *values = path->path_segments.values;
+        struct ok_path_segment *src_values = path_to_append->path_segments.values;
+        struct ok_path_segment *dst_values = &values[path->path_segments.length];
+        memcpy(dst_values, src_values, count * sizeof(struct ok_path_segment));
         path->path_segments.length += count;
         path->subpath_origin_x = path_to_append->subpath_origin_x;
         path->subpath_origin_y = path_to_append->subpath_origin_y;
     }
 }
 
-void ok_path_close(ok_path *path) {
+void ok_path_close(ok_path_t *path) {
     ok_path_line_to(path, path->subpath_origin_x, path->subpath_origin_y);
 }
 
-void ok_path_quad_curve_to(ok_path *path, const double cx, const double cy,
+void ok_path_quad_curve_to(ok_path_t *path, const double cx, const double cy,
                            const double x, const double y) {
     double last_x = ok_path_last_x(path);
     double last_y = ok_path_last_y(path);
@@ -230,11 +236,12 @@ void ok_path_quad_curve_to(ok_path *path, const double cx, const double cy,
     ok_path_curve_to(path, cx1, cy1, cx2, cy2, x, y);
 }
 
-void ok_path_arc_to(ok_path *path, double radius, bool large_arc, bool sweep, double x, double y) {
+void ok_path_arc_to(ok_path_t *path, double radius, bool large_arc, bool sweep,
+                    double x, double y) {
     ok_path_elliptical_arc_to(path, radius, radius, 0.0, large_arc, sweep, x, y);
 }
 
-void ok_path_elliptical_arc_to(ok_path *path, const double radius_x, const double radius_y,
+void ok_path_elliptical_arc_to(ok_path_t *path, const double radius_x, const double radius_y,
                                const double rotation_radians, const bool large_arc,
                                const bool sweep, const double x, const double y) {
     // Convert arc to a series of bezier curves.
@@ -382,7 +389,7 @@ static const char *const SVG_WHITESPACE_OR_COMMA = ", \t\r\n";
 
 static char SVG_ERROR_MESSAGE[80];
 
-bool ok_path_append_svg(ok_path *path, const char *svg_path, char **out_error_message) {
+bool ok_path_append_svg(ok_path_t *path, const char *svg_path, char **out_error_message) {
     const char *str = svg_path;
     double values[7];
     char last_command = 0;
@@ -630,7 +637,7 @@ bool ok_path_append_svg(ok_path *path, const char *svg_path, char **out_error_me
 
 // MARK: Path flattening
 
-static void ok_path_add_flattened_segment(ok_path *path, const ok_path_type type,
+static void ok_path_add_flattened_segment(ok_path_t *path, const enum ok_path_type type,
                                           const double x, const double y) {
     double dx;
     double dy;
@@ -640,18 +647,18 @@ static void ok_path_add_flattened_segment(ok_path *path, const ok_path_type type
         dy = y;
         prev_length = 0;
     } else {
-        ok_path_flattened_segment *flattened_segments = path->flattened_segments.values;
-        ok_path_flattened_segment *flattened_segment =
+        struct ok_path_flattened_segment *flattened_segments = path->flattened_segments.values;
+        struct ok_path_flattened_segment *flattened_segment =
             &flattened_segments[path->flattened_segments.length - 1];
         dx = x - flattened_segment->x;
         dy = y - flattened_segment->y;
         prev_length = flattened_segment->length_to;
     }
 
-    if (ok_vector_ensure_capacity(&path->flattened_segments, sizeof(ok_path_flattened_segment),
-                                  1)) {
-        ok_path_flattened_segment *flattened_segments = path->flattened_segments.values;
-        ok_path_flattened_segment *flattened_segment =
+    if (vector_ensure_capacity(&path->flattened_segments,
+                               sizeof(struct ok_path_flattened_segment), 1)) {
+        struct ok_path_flattened_segment *flattened_segments = path->flattened_segments.values;
+        struct ok_path_flattened_segment *flattened_segment =
             &flattened_segments[path->flattened_segments.length++];
         flattened_segment->type = type;
         flattened_segment->x = x;
@@ -709,7 +716,7 @@ static int num_segments(double x0, double y0, double x1, double y1, double x2, d
     return num_segments;
 }
 
-static void ok_path_to_line_segments(ok_path *path, const int num_segments,
+static void ok_path_to_line_segments(ok_path_t *path, const int num_segments,
                                      const double x0, const double y0,
                                      const double x1, const double y1,
                                      const double x2, const double y2,
@@ -751,7 +758,7 @@ static void ok_path_to_line_segments(ok_path *path, const int num_segments,
     ok_path_add_flattened_segment(path, CURVE_TO, x3, y3);
 }
 
-static void ok_path_flatten_curve_to(ok_path *path,
+static void ok_path_flatten_curve_to(ok_path_t *path,
                                      const double x1, const double y1,
                                      const double x2, const double y2,
                                      const double x3, const double y3,
@@ -813,10 +820,10 @@ static void ok_path_flatten_curve_to(ok_path *path,
     ok_path_to_line_segments(path, num_segments4, rx1234, ry1234, rx234, ry234, rx34, ry34, x4, y4);
 }
 
-static void ok_path_flatten_if_needed(ok_path *path) {
+static void ok_path_flatten_if_needed(ok_path_t *path) {
     while (path->path_segments.length > path->num_segments_flattened) {
-        ok_path_segment *segments = path->path_segments.values;
-        ok_path_segment *segment = &segments[path->num_segments_flattened];
+        struct ok_path_segment *segments = path->path_segments.values;
+        struct ok_path_segment *segment = &segments[path->num_segments_flattened];
         if (segment->type != CURVE_TO) {
             ok_path_add_flattened_segment(path, segment->type, segment->x, segment->y);
         } else {
@@ -827,8 +834,9 @@ static void ok_path_flatten_if_needed(ok_path *path) {
                 x = 0;
                 y = 0;
             } else {
-                ok_path_flattened_segment *flattened_segments = path->flattened_segments.values;
-                ok_path_flattened_segment *flattened_segment = &flattened_segments[len - 1];
+                struct ok_path_flattened_segment *flattened_segments =
+                    path->flattened_segments.values;
+                struct ok_path_flattened_segment *flattened_segment = &flattened_segments[len - 1];
                 x = flattened_segment->x;
                 y = flattened_segment->y;
             }
@@ -842,10 +850,10 @@ static void ok_path_flatten_if_needed(ok_path *path) {
 
 // MARK: Path querying
 
-double ok_path_get_length(ok_path *path) {
+double ok_path_get_length(ok_path_t *path) {
     ok_path_flatten_if_needed(path);
     if (path->flattened_segments.length > 0) {
-        ok_path_flattened_segment *flattened_segments = path->flattened_segments.values;
+        struct ok_path_flattened_segment *flattened_segments = path->flattened_segments.values;
         return flattened_segments[path->flattened_segments.length - 1].length_to;
     } else {
         return 0.0;
@@ -876,7 +884,7 @@ static double shortest_arc(const double from_radians, const double to_radians) {
     }
 }
 
-void ok_path_get_location(ok_path *path, const double p, double *out_x, double *out_y,
+void ok_path_get_location(ok_path_t *path, const double p, double *out_x, double *out_y,
                           double *out_angle) {
     ok_path_flatten_if_needed(path);
     const size_t count = path->flattened_segments.length;
@@ -891,7 +899,7 @@ void ok_path_get_location(ok_path *path, const double p, double *out_x, double *
             *out_angle = 0;
         }
     } else {
-        ok_path_flattened_segment *flattened_segments = path->flattened_segments.values;
+        struct ok_path_flattened_segment *flattened_segments = path->flattened_segments.values;
         const double length = flattened_segments[count - 1].length_to;
         size_t p_low;
         size_t p_high;
@@ -916,8 +924,8 @@ void ok_path_get_location(ok_path *path, const double p, double *out_x, double *
             }
         }
 
-        ok_path_flattened_segment *s1 = &flattened_segments[p_low];
-        ok_path_flattened_segment *s2 = &flattened_segments[p_high];
+        struct ok_path_flattened_segment *s1 = &flattened_segments[p_low];
+        struct ok_path_flattened_segment *s2 = &flattened_segments[p_high];
         if (p_low == p_high || length == 0) {
             if (out_x) {
                 *out_x = s1->x;
