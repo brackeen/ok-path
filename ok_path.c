@@ -233,6 +233,22 @@ void ok_path_append(ok_path_t *path, const ok_path_t *path_to_append) {
     }
 }
 
+void ok_path_append_lines(ok_path_t *path, const double (*points)[2], const size_t num_points) {
+    struct vector_of_path_segments *path_segments = &path->path_segments;
+    if (num_points > 0 && vector_ensure_capacity(path_segments, num_points)) {
+        ok_path_move_to(path, (*points)[0], (*points)[1]);
+        points++;
+
+        for (size_t i = 1; i < num_points; i++) {
+            struct ok_path_segment *segment = vector_at(path_segments, path_segments->length++);
+            segment->type = LINE_TO;
+            segment->x = (*points)[0];
+            segment->y = (*points)[1];
+            points++;
+        }
+    }
+}
+
 void ok_path_close(ok_path_t *path) {
     ok_path_line_to(path, path->subpath_origin_x, path->subpath_origin_y);
 }

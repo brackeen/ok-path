@@ -10,7 +10,7 @@ static int test_svg_parse() {
 
     // Test if two empty paths are equal
     if (!ok_path_equals(path1, path2)) {
-        printf("Failure: Empty paths not equal\n");
+        printf("Failure: %s: Empty paths not equal\n", __func__);
         ok_path_free(path1);
         ok_path_free(path2);
         return 1;
@@ -30,7 +30,7 @@ static int test_svg_parse() {
                            "Z";
 
     if (!ok_path_append_svg(path1, svg_path, &error)) {
-        printf("Failure: SVG parse error: %s\n", error);
+        printf("Failure: %s: SVG parse error: %s\n", error, __func__);
         ok_path_free(path1);
         ok_path_free(path2);
         return 1;
@@ -53,25 +53,66 @@ static int test_svg_parse() {
     ok_path_close(path2);
 
     if (!ok_path_equals(path1, path2)) {
-        printf("Failure: Paths not equal\n");
+        printf("Failure: %s: Paths not equal\n", __func__);
         ok_path_free(path1);
         ok_path_free(path2);
         return 1;
     }
 
     if (ok_path_get_length(path1) != ok_path_get_length(path2)) {
-        printf("Failure: Path lengths not equal\n");
+        printf("Failure: %s: Path lengths not equal\n", __func__);
         ok_path_free(path1);
         ok_path_free(path2);
         return 1;
     }
 
-    printf("Success\n");
+    printf("Success: %s\n", __func__);
     ok_path_free(path1);
     ok_path_free(path2);
     return 0;
 }
 
+static int test_append_lines() {
+    ok_path_t *path1 = ok_path_alloc();
+    ok_path_t *path2;
+
+    char *error;
+    const char *svg_path = "M 0,0 L 10,20, 40,20, 30,10, 50,0 Z";
+    if (!ok_path_append_svg(path1, svg_path, &error)) {
+        printf("Failure: %s: SVG parse error: %s\n", error, __func__);
+        ok_path_free(path1);
+        return 1;
+    }
+
+    // Using 2D array
+    double points[][2] = {{0, 0}, {10, 20}, {40, 20}, {30, 10}, {50, 0}, {0, 0}};
+    path2 = ok_path_alloc();
+    ok_path_append_lines(path2, points, sizeof(points) / sizeof(*points));
+    if (!ok_path_equals(path1, path2)) {
+        printf("Failure: %s: Paths not equal\n", __func__);
+        ok_path_free(path1);
+        ok_path_free(path2);
+        return 1;
+    }
+    ok_path_free(path2);
+
+    // Using 1D array
+    double points2[] = {0, 0, 10, 20, 40, 20, 30, 10, 50, 0, 0, 0};
+    path2 = ok_path_alloc();
+    ok_path_append_lines(path2, points, sizeof(points2) / (sizeof(*points2) * 2));
+    if (!ok_path_equals(path1, path2)) {
+        printf("Failure: %s: Paths not equal\n", __func__);
+        ok_path_free(path1);
+        ok_path_free(path2);
+        return 1;
+    }
+    ok_path_free(path2);
+
+    printf("Success: %s\n", __func__);
+    ok_path_free(path1);
+    return 0;
+}
+
 int main() {
-    return test_svg_parse();
+    return test_svg_parse() || test_append_lines();
 }

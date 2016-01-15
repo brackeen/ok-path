@@ -130,6 +130,19 @@ void ok_path_elliptical_arc_to(ok_path_t *path, double radius_x, double radius_y
 void ok_path_append(ok_path_t *path, const ok_path_t *path_to_append);
 
 /**
+ * Appends a series of line segments to the path. Calling this function is equivalent to calling
+ * #ok_path_move_to for the first point, and #ok_path_line_to for the remaining points. Example:
+ *
+ *     double points[][2] = {{0, 0}, {10, 20}, {40, 20}, {30, 10}, {50, 0}, {0, 0}};
+ *     ok_path_append_lines(path, points, sizeof(points) / sizeof(*points));
+ *
+ * @param path The path.
+ * @param points The array of points.
+ * @param num_points The number of points.
+ */
+void ok_path_append_lines(ok_path_t *path, const double (*points)[2], size_t num_points);
+
+/**
  * Appends an SVG path, like "M 100,100 L 200,100 200,200 100,200 Z".
  * The entire specification defined at http://www.w3.org/TR/SVG/paths.html is accepted.
  *
