@@ -7,6 +7,15 @@
 static int test_svg_parse() {
     ok_path_t *path1 = ok_path_alloc();
     ok_path_t *path2 = ok_path_alloc();
+
+    // Test if two empty paths are equal
+    if (!ok_path_equals(path1, path2)) {
+        printf("Failure: Empty paths not equal\n");
+        ok_path_free(path1);
+        ok_path_free(path2);
+        return 1;
+    }
+
     char *error;
 
     // Test if the SVG path is identical to the programatically constructed path.
