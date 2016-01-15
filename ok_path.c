@@ -340,7 +340,7 @@ void ok_path_elliptical_arc_to(ok_path_t *path, const double radius_x, const dou
         double s = angle_start;
         double d = (sweep ? M_PI_2 : -M_PI_2);
         while (true) {
-            if ((sweep && s > angle_end) || (!sweep && s < angle_end)) {
+            if ((sweep && s >= angle_end) || (!sweep && s <= angle_end)) {
                 break;
             }
 
@@ -385,7 +385,6 @@ void ok_path_elliptical_arc_to(ok_path_t *path, const double radius_x, const dou
                              x_a + alpha * x_a_dot, y_a + alpha * y_a_dot,
                              x_b - alpha * x_b_dot, y_b - alpha * y_b_dot,
                              x_b, y_b);
-
             s += d;
         }
     }
