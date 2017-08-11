@@ -18,8 +18,8 @@
  3. This notice may not be removed or altered from any source distribution.
  */
 
-#ifndef _OK_PATH_H_
-#define _OK_PATH_H_
+#ifndef OK_PATH_H
+#define OK_PATH_H
 
 #include <stdbool.h>
 #include <stddef.h>
