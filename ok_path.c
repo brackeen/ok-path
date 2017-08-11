@@ -91,9 +91,9 @@ static bool vector_reserve(void **values, size_t *length, size_t *capacity,
 // MARK: Path
 
 enum ok_path_type {
-    MOVE_TO = 0,
-    LINE_TO,
-    CURVE_TO,
+    OK_PATH_MOVE_TO = 0,
+    OK_PATH_LINE_TO,
+    OK_PATH_CURVE_TO,
 };
 
 struct ok_path_segment {
@@ -157,7 +157,7 @@ bool ok_path_equals(const ok_path_t *path1, const ok_path_t *path2) {
         if (segment1->x != segment2->x || segment1->y != segment2->y) {
             return false;
         }
-        if (segment1->type == CURVE_TO) {
+        if (segment1->type == OK_PATH_CURVE_TO) {
             if (segment1->cx1 != segment2->cx1 || segment1->cy1 != segment2->cy1 ||
                 segment1->cx2 != segment2->cx2 || segment1->cy2 != segment2->cy2) {
                 return false;
@@ -190,7 +190,7 @@ static double ok_path_last_y(const ok_path_t *path) {
 void ok_path_move_to(ok_path_t *path, const double x, const double y) {
     struct ok_path_segment *segment = vector_push_new(&path->path_segments);
     if (segment) {
-        segment->type = MOVE_TO;
+        segment->type = OK_PATH_MOVE_TO;
         segment->x = x;
         segment->y = y;
         path->subpath_origin_x = x;
@@ -201,7 +201,7 @@ void ok_path_move_to(ok_path_t *path, const double x, const double y) {
 void ok_path_line_to(ok_path_t *path, const double x, const double y) {
     struct ok_path_segment *segment = vector_push_new(&path->path_segments);
     if (segment) {
-        segment->type = LINE_TO;
+        segment->type = OK_PATH_LINE_TO;
         segment->x = x;
         segment->y = y;
     }
@@ -211,7 +211,7 @@ void ok_path_curve_to(ok_path_t *path, const double cx1, const double cy1,
                       const double cx2, const double cy2, const double x, const double y) {
     struct ok_path_segment *segment = vector_push_new(&path->path_segments);
     if (segment) {
-        segment->type = CURVE_TO;
+        segment->type = OK_PATH_CURVE_TO;
         segment->x = x;
         segment->y = y;
         segment->cx1 = cx1;
@@ -242,7 +242,7 @@ void ok_path_append_lines(ok_path_t *path, const double (*points)[2], const size
 
         for (size_t i = 1; i < num_points; i++) {
             struct ok_path_segment *segment = vector_at(path_segments, path_segments->length++);
-            segment->type = LINE_TO;
+            segment->type = OK_PATH_LINE_TO;
             segment->x = (*points)[0];
             segment->y = (*points)[1];
             points++;
@@ -409,11 +409,13 @@ void ok_path_elliptical_arc_to(ok_path_t *path, const double radius_x, const dou
 
 // MARK: SVG path parsing
 
-static const char *const SVG_COMMANDS = "MmLlHhVvAaQqTtCcSsZz";
-static const unsigned int SVG_COMMAND_VALUES[] = {2, 2, 2, 2, 1, 1, 1, 1, 7, 7,
-                                                  4, 4, 2, 2, 6, 6, 4, 4, 0, 0};
-static const char *const SVG_WHITESPACE = " \t\r\n";
-static const char *const SVG_WHITESPACE_OR_COMMA = ", \t\r\n";
+static const char * const OK_PATH_SVG_COMMANDS = "MmLlHhVvAaQqTtCcSsZz";
+static const unsigned int OK_PATH_SVG_COMMAND_VALUES[] = {
+    2, 2, 2, 2, 1, 1, 1, 1, 7, 7,
+    4, 4, 2, 2, 6, 6, 4, 4, 0, 0
+};
+static const char *const OK_PATH_SVG_WHITESPACE = " \t\r\n";
+static const char *const OK_PATH_SVG_WHITESPACE_OR_COMMA = ", \t\r\n";
 
 static char SVG_ERROR_MESSAGE[80];
 
@@ -432,17 +434,21 @@ bool ok_path_append_svg(ok_path_t *path, const char *svg_path, char **out_error_
 
     while (str && *str) {
         bool command_required = last_values_required == 0;
-        const char *skip_chars = command_required ? SVG_WHITESPACE : SVG_WHITESPACE_OR_COMMA;
+        const char *skip_chars = (command_required ? OK_PATH_SVG_WHITESPACE :
+                                  OK_PATH_SVG_WHITESPACE_OR_COMMA);
         if (strchr(skip_chars, *str)) {
             str++;
         } else {
             // Get command
             char command;
             unsigned int values_required;
-            char *found = strchr(SVG_COMMANDS, *str);
-            if (found || command_required) {
+            char *found = strchr(OK_PATH_SVG_COMMANDS, *str);
+            if (found) {
                 command = *str++;
-                values_required = found ? SVG_COMMAND_VALUES[found - SVG_COMMANDS] : 0;
+                values_required = OK_PATH_SVG_COMMAND_VALUES[found - OK_PATH_SVG_COMMANDS];
+            } else if (command_required) {
+                command = *str++;
+                values_required = 0;
             } else {
                 command = last_command;
                 values_required = last_values_required;
@@ -452,7 +458,7 @@ bool ok_path_append_svg(ok_path_t *path, const char *svg_path, char **out_error_
             if (values_required > 0) {
                 unsigned int count = 0;
                 while (*str && count < values_required) {
-                    if (count > 0 && strchr(SVG_WHITESPACE_OR_COMMA, *str)) {
+                    if (count > 0 && strchr(OK_PATH_SVG_WHITESPACE_OR_COMMA, *str)) {
                         str++;
                     } else {
                         char *endptr;
@@ -689,7 +695,7 @@ static void ok_path_add_flattened_segment(ok_path_t *path, const enum ok_path_ty
         flattened_segment->x = x;
         flattened_segment->y = y;
         flattened_segment->angle_to = atan2(dy, dx);
-        if (type == MOVE_TO) {
+        if (type == OK_PATH_MOVE_TO) {
             flattened_segment->length_to = prev_length;
         } else {
             flattened_segment->length_to = prev_length + sqrt(dx * dx + dy * dy);
@@ -697,7 +703,8 @@ static void ok_path_add_flattened_segment(ok_path_t *path, const enum ok_path_ty
     }
 }
 
-static double approx_dist(double px, double py, double ax, double ay, double bx, double by) {
+static double ok_path_approx_dist(double px, double py, double ax, double ay,
+                                  double bx, double by) {
     // Distance from a point to a line approximation. From Graphics Gems II, page 11.
     double dx = fabs(bx - ax);
     double dy = fabs(by - ay);
@@ -713,7 +720,7 @@ static double approx_dist(double px, double py, double ax, double ay, double bx,
     return fabs(a2) / div;
 }
 
-static int ilog2(int n) {
+static int ok_path_ilog2(int n) {
     int count = 0;
     while (true) {
         n >>= 1;
@@ -728,13 +735,13 @@ static int num_segments(double x0, double y0, double x1, double y1, double x2, d
                         double x3, double y3) {
     int num_segments;
 
-    double dist = fmax(approx_dist(x1, y1, x0, y0, x3, y3),
-                       approx_dist(x2, y2, x0, y0, x3, y3));
+    double dist = fmax(ok_path_approx_dist(x1, y1, x0, y0, x3, y3),
+                       ok_path_approx_dist(x2, y2, x0, y0, x3, y3));
 
     if (dist <= 0) {
         num_segments = 1;
     } else {
-        num_segments = MAX(1, 1 << (ilog2((int)lround(dist * 1.5))));
+        num_segments = MAX(1, 1 << (ok_path_ilog2((int)lround(dist * 1.5))));
         num_segments = MIN(num_segments, 16); // XXX: Max of 16 segments? Why?
     }
 
@@ -777,10 +784,10 @@ static void ok_path_to_line_segments(ok_path_t *path, const int num_segments,
         yfdd += yfddd;
         yfdd2 += yfddd2;
 
-        ok_path_add_flattened_segment(path, CURVE_TO, xf, yf);
+        ok_path_add_flattened_segment(path, OK_PATH_CURVE_TO, xf, yf);
     }
 
-    ok_path_add_flattened_segment(path, CURVE_TO, x3, y3);
+    ok_path_add_flattened_segment(path, OK_PATH_CURVE_TO, x3, y3);
 }
 
 static void ok_path_flatten_curve_to(ok_path_t *path,
@@ -848,7 +855,7 @@ static void ok_path_flatten_curve_to(ok_path_t *path,
 static void ok_path_flatten_if_needed(ok_path_t *path) {
     while (path->path_segments.length > path->num_segments_flattened) {
         struct ok_path_segment *segment = &path->path_segments.values[path->num_segments_flattened];
-        if (segment->type != CURVE_TO) {
+        if (segment->type != OK_PATH_CURVE_TO) {
             ok_path_add_flattened_segment(path, segment->type, segment->x, segment->y);
         } else {
             double x;
@@ -879,7 +886,7 @@ double ok_path_get_length(ok_path_t *path) {
     }
 }
 
-static double wrap_to_plus_minus_pi(const double radians) {
+static double ok_path_wrap_to_plus_minus_pi(const double radians) {
     if (radians < -M_PI || radians > M_PI) {
         // Transform range to (0 to 1)
         double new_angle = (radians + M_PI) / (2 * M_PI);
@@ -891,9 +898,9 @@ static double wrap_to_plus_minus_pi(const double radians) {
     }
 }
 
-static double shortest_arc(const double from_radians, const double to_radians) {
-    const double from_value = wrap_to_plus_minus_pi(from_radians);
-    const double to_value = wrap_to_plus_minus_pi(to_radians);
+static double ok_path_shortest_arc(const double from_radians, const double to_radians) {
+    const double from_value = ok_path_wrap_to_plus_minus_pi(from_radians);
+    const double to_value = ok_path_wrap_to_plus_minus_pi(to_radians);
     const double d1 = to_value - from_value;
     const double d2 = from_value - to_value + 2 * M_PI;
     if (fabs(d1) < fabs(d2)) {
@@ -977,12 +984,12 @@ void ok_path_get_location(ok_path_t *path, const double p, double *out_x, double
                     *out_y = s1->y + (s2->y - s1->y) * (p - p1) / (p2 - p1);
                 }
                 if (out_angle) {
-                    if (s1->type == MOVE_TO || s2->type != CURVE_TO) {
+                    if (s1->type == OK_PATH_MOVE_TO || s2->type != OK_PATH_CURVE_TO) {
                         *out_angle = s2->angle_to;
                     } else {
                         const double angle1 = s1->angle_to;
                         const double angle2 = s2->angle_to;
-                        const double d_angle = shortest_arc(angle1, angle2);
+                        const double d_angle = ok_path_shortest_arc(angle1, angle2);
                         *out_angle = angle1 + d_angle * (p - p1) / (p2 - p1);
                     }
                 }
