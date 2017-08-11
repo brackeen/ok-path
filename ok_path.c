@@ -20,11 +20,13 @@
  */
 
 #include "ok_path.h"
-#include <ctype.h>
 #include <math.h>
 #include <memory.h>
-#include <stdio.h> // For snprintf
 #include <stdlib.h>
+
+#ifndef NDEBUG
+#include <stdio.h> // For snprintf
+#endif
 
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -414,10 +416,23 @@ static const unsigned int OK_PATH_SVG_COMMAND_VALUES[] = {
     2, 2, 2, 2, 1, 1, 1, 1, 7, 7,
     4, 4, 2, 2, 6, 6, 4, 4, 0, 0
 };
-static const char *const OK_PATH_SVG_WHITESPACE = " \t\r\n";
-static const char *const OK_PATH_SVG_WHITESPACE_OR_COMMA = ", \t\r\n";
+static const char * const OK_PATH_SVG_WHITESPACE = " \t\r\n";
+static const char * const OK_PATH_SVG_WHITESPACE_OR_COMMA = ", \t\r\n";
 
-static char SVG_ERROR_MESSAGE[80];
+#ifdef NDEBUG
+#define ok_path_error(out_error_message, format, ...) do { \
+    if (out_error_message) *out_error_message = "ok_path_error"; \
+} while (0)
+#else
+static char OK_PATH_SVG_ERROR_MESSAGE[80];
+#define ok_path_error(out_error_message, format, ...) do { \
+    if (out_error_message) { \
+        snprintf(OK_PATH_SVG_ERROR_MESSAGE, sizeof(OK_PATH_SVG_ERROR_MESSAGE), \
+                 format, __VA_ARGS__); \
+        *out_error_message = OK_PATH_SVG_ERROR_MESSAGE; \
+    } \
+} while (0)
+#endif
 
 bool ok_path_append_svg(ok_path_t *path, const char *svg_path, char **out_error_message) {
     const char *str = svg_path;
@@ -464,23 +479,16 @@ bool ok_path_append_svg(ok_path_t *path, const char *svg_path, char **out_error_
                         char *endptr;
                         values[count++] = strtod(str, &endptr);
                         if (str == endptr) {
-                            if (out_error_message) {
-                                snprintf(SVG_ERROR_MESSAGE, sizeof(SVG_ERROR_MESSAGE),
-                                         "Could not parse number at position: %li", str - svg_path);
-                                *out_error_message = SVG_ERROR_MESSAGE;
-                            }
+                            ok_path_error(out_error_message,
+                                          "Could not parse number at: %li", str - svg_path);
                             return false;
                         }
                         str = endptr;
                     }
                 }
                 if (count < values_required) {
-                    if (out_error_message) {
-                        snprintf(SVG_ERROR_MESSAGE, sizeof(SVG_ERROR_MESSAGE),
-                                 "Unexpected EOF: Needed %i more numbers",
-                                 (values_required - count));
-                        *out_error_message = SVG_ERROR_MESSAGE;
-                    }
+                    ok_path_error(out_error_message, "Unexpected EOF: Needed %i more numbers",
+                                  (values_required - count));
                     return false;
                 }
             }
@@ -652,12 +660,8 @@ bool ok_path_append_svg(ok_path_t *path, const char *svg_path, char **out_error_
                     break;
                 }
                 default: {
-                    if (out_error_message) {
-                        snprintf(SVG_ERROR_MESSAGE, sizeof(SVG_ERROR_MESSAGE),
-                                 "Invalid SVG command %c at position %li",
-                                 command, (str - svg_path));
-                        *out_error_message = SVG_ERROR_MESSAGE;
-                    }
+                    ok_path_error(out_error_message, "Invalid SVG command %c at position %li",
+                                  command, (str - svg_path));
                     return false;
                 }
             }
