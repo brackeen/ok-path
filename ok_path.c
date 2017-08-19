@@ -37,6 +37,9 @@
 
 // MARK: Vector
 
+// Examples:
+// typedef struct vector_of(int) vector_int_t;
+// struct vector_of_ints vector_of(int);
 #define vector_of(type) \
     { type *values; size_t length; size_t capacity; }
 
@@ -45,6 +48,9 @@
 
 #define vector_free(v) \
     free((v)->values)
+
+#define vector_clear(v) \
+    (v)->length = 0
 
 #define vector_begin(v) \
     ((v)->values)
@@ -64,6 +70,11 @@
 #define vector_push_new(v) \
     (vector_ensure_capacity(v, 1) ? ((v)->values + ((v)->length++)) : NULL)
 
+#define vector_push_all(v, v2) \
+    (vector_ensure_capacity(v, (v2)->length) ? \
+    (memcpy((v)->values + (v)->length, (v2)->values, sizeof(*(v)->values) * (v2)->length), \
+    ((v)->length += (v2)->length)) : 0)
+
 #define vector_foreach(var, v) \
     for (size_t keep = 1, i = 0, len = (v)->length; keep && i < len; keep = !keep, i++) \
     for (var = *((v)->values + i); keep; keep = !keep)
@@ -73,21 +84,21 @@
     for (var = (v)->values + i; keep; keep = !keep)
 
 #define vector_ensure_capacity(v, additional_count) \
-    vector_reserve((void **)&(v)->values, &(v)->length, &(v)->capacity, sizeof(*(v)->values), \
-                   additional_count)
+    (((v)->length + (size_t)(additional_count) <= (v)->capacity) ? true : \
+    vector_realloc((void **)&(v)->values, (v)->length + (size_t)(additional_count), \
+                   sizeof(*(v)->values), &(v)->capacity))
 
-static bool vector_reserve(void **values, size_t *length, size_t *capacity,
-                           const size_t element_size, const size_t additional_count) {
-    if (*length + additional_count > *capacity) {
-        const size_t new_capacity = MAX(8, MAX(*length + additional_count, *capacity << 1));
-        void *new_values = realloc(*values, element_size * new_capacity);
-        if (!new_values) {
-            return false;
-        }
+static bool vector_realloc(void **values, size_t min_capacity, size_t element_size,
+                           size_t *capacity) {
+    size_t new_capacity = MAX(8, MAX(min_capacity, *capacity << 1));
+    void *new_values = realloc(*values, element_size * new_capacity);
+    if (new_values) {
         *values = new_values;
         *capacity = new_capacity;
+        return true;
+    } else {
+        return false;
     }
-    return true;
 }
 
 // MARK: Path
