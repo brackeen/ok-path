@@ -290,7 +290,7 @@ void ok_path_elliptical_arc_to(ok_path_t *path, const double radius_x, const dou
     // Interface is the same as the SVG spec, except xAxisRotation is in radians, not degrees.
     // See http://www.w3.org/TR/SVG/paths.html#PathDataEllipticalArcCommands
     // See http://www.w3.org/TR/SVG/implnote.html#ArcImplementationNotes
-    if (radius_x == 0 || radius_y == 0) {
+    if (radius_x == 0.0 || radius_y == 0.0) {
         ok_path_line_to(path, x, y);
     } else {
         const double curr_x = ok_path_last_x(path);
@@ -339,18 +339,18 @@ void ok_path_elliptical_arc_to(ok_path_t *path, const double radius_x, const dou
         double n = sqrt(ux * ux + uy * uy);
         double p = ux;
         double angle_start = acos(p / n);
-        if (uy < 0) {
+        if (uy < 0.0) {
             angle_start = -angle_start;
         }
         n = sqrt((ux * ux + uy * uy) * (vx * vx + vy * vy));
         p = ux * vx + uy * vy;
         double angle_extent = acos(p / n);
-        if (ux * vy - uy * vx < 0) {
+        if (ux * vy - uy * vx < 0.0) {
             angle_extent = -angle_extent;
         }
-        if (!sweep && angle_extent > 0) {
+        if (!sweep && angle_extent > 0.0) {
             angle_extent -= 2.0 * M_PI;
-        } else if (sweep && angle_extent < 0) {
+        } else if (sweep && angle_extent < 0.0) {
             angle_extent += 2.0 * M_PI;
         }
         double angle_end = angle_start + angle_extent;
@@ -451,12 +451,8 @@ bool ok_path_append_svg(ok_path_t *path, const char *svg_path, char **out_error_
     char last_command = 0;
     unsigned int last_values_required = 0;
     bool last_control_set = false;
-    double curr_x = 0, curr_y = 0;
-    double control_x = 0, control_y = 0;
-
-    if (!str && out_error_message) {
-        *out_error_message = "svg_path is NULL";
-    }
+    double curr_x = 0.0, curr_y = 0.0;
+    double control_x = 0.0, control_y = 0.0;
 
     while (str && *str) {
         bool command_required = last_values_required == 0;
@@ -657,8 +653,8 @@ bool ok_path_append_svg(ok_path_t *path, const char *svg_path, char **out_error_
                     double radius_x = values[0];
                     double radius_y = values[1];
                     double angle = values[2] * M_PI / 180.0;
-                    bool large_arc = values[3] != 0;
-                    bool sweep = values[4] != 0;
+                    bool large_arc = values[3] != 0.0;
+                    bool sweep = values[4] != 0.0;
                     if (command == 'A') {
                         curr_x = values[5];
                         curr_y = values[6];
@@ -694,7 +690,7 @@ static void ok_path_add_flattened_segment(ok_path_t *path, const enum ok_path_ty
     if (path->flattened_segments.length == 0) {
         dx = x;
         dy = y;
-        prev_length = 0;
+        prev_length = 0.0;
     } else {
         struct ok_path_flattened_segment *flattened_segment =
             vector_last(&path->flattened_segments);
@@ -726,8 +722,8 @@ static double ok_path_approx_dist(double px, double py, double ax, double ay,
 
     double div = dx + dy - fmin(dx, dy) / 2.0;
 
-    if (div == 0) {
-        return 0;
+    if (div == 0.0) {
+        return 0.0;
     }
 
     double a2 = (py - ay) * (bx - ax) - (px - ax) * (by - ay);
@@ -746,8 +742,8 @@ static int ok_path_ilog2(int n) {
     }
 }
 
-static int num_segments(double x0, double y0, double x1, double y1, double x2, double y2,
-                        double x3, double y3) {
+static int ok_path_num_segments(double x0, double y0, double x1, double y1,
+                                double x2, double y2, double x3, double y3) {
     int num_segments;
 
     double dist = fmax(ok_path_approx_dist(x1, y1, x0, y0, x3, y3),
@@ -773,20 +769,20 @@ static void ok_path_to_line_segments(ok_path_t *path, const int num_segments,
     const double t3 = t2 * t;
 
     double xf = x0;
-    double xfd = 3 * (x1 - x0) * t;
-    double xfdd2 = 3 * (x0 - 2 * x1 + x2) * t2;
-    double xfddd6 = (3 * (x1 - x2) + x3 - x0) * t3;
-    double xfddd2 = 3 * xfddd6;
-    double xfdd = 2 * xfdd2;
-    double xfddd = 2 * xfddd2;
+    double xfd = 3.0 * (x1 - x0) * t;
+    double xfdd2 = 3.0 * (x0 - 2.0 * x1 + x2) * t2;
+    double xfddd6 = (3.0 * (x1 - x2) + x3 - x0) * t3;
+    double xfddd2 = 3.0 * xfddd6;
+    double xfdd = 2.0 * xfdd2;
+    double xfddd = 2.0 * xfddd2;
 
     double yf = y0;
-    double yfd = 3 * (y1 - y0) * t;
-    double yfdd2 = 3 * (y0 - 2 * y1 + y2) * t2;
-    double yfddd6 = (3 * (y1 - y2) + y3 - y0) * t3;
-    double yfddd2 = 3 * yfddd6;
-    double yfdd = 2 * yfdd2;
-    double yfddd = 2 * yfddd2;
+    double yfd = 3.0 * (y1 - y0) * t;
+    double yfdd2 = 3.0 * (y0 - 2.0 * y1 + y2) * t2;
+    double yfddd6 = (3.0 * (y1 - y2) + y3 - y0) * t3;
+    double yfddd2 = 3.0 * yfddd6;
+    double yfdd = 2.0 * yfdd2;
+    double yfddd = 2.0 * yfddd2;
 
     for (int i = 1; i < num_segments; i++) {
         xf += xfd + xfdd2 + xfddd6;
@@ -853,18 +849,24 @@ static void ok_path_flatten_curve_to(ok_path_t *path,
     const double ry1234 = (ry123 + ry234) / 2;
 
     // Determine the number of segments for each division
-    const int num_segments1 = num_segments(x1, y1, lx12, ly12, lx123, ly123, lx1234, ly1234);
-    const int num_segments2 = num_segments(lx1234, ly1234, lx234, ly234, lx34, ly34, x1234, y1234);
-    const int num_segments3 = num_segments(x1234, y1234, rx12, ry12, rx123, ry123, rx1234, ry1234);
-    const int num_segments4 = num_segments(rx1234, ry1234, rx234, ry234, rx34, ry34, x4, y4);
+    const int num_segments1 = ok_path_num_segments(x1, y1, lx12, ly12,
+                                                   lx123, ly123, lx1234, ly1234);
+    const int num_segments2 = ok_path_num_segments(lx1234, ly1234, lx234, ly234,
+                                                   lx34, ly34, x1234, y1234);
+    const int num_segments3 = ok_path_num_segments(x1234, y1234, rx12, ry12,
+                                                   rx123, ry123, rx1234, ry1234);
+    const int num_segments4 = ok_path_num_segments(rx1234, ry1234, rx234, ry234,
+                                                   rx34, ry34, x4, y4);
 
     // Convert to lines
-    ok_path_to_line_segments(path, num_segments1, x1, y1, lx12, ly12, lx123, ly123, lx1234, ly1234);
-    ok_path_to_line_segments(path, num_segments2, lx1234, ly1234, lx234, ly234, lx34, ly34,
-                             x1234, y1234);
-    ok_path_to_line_segments(path, num_segments3, x1234, y1234, rx12, ry12, rx123, ry123,
-                             rx1234, ry1234);
-    ok_path_to_line_segments(path, num_segments4, rx1234, ry1234, rx234, ry234, rx34, ry34, x4, y4);
+    ok_path_to_line_segments(path, num_segments1,
+                             x1, y1, lx12, ly12, lx123, ly123, lx1234, ly1234);
+    ok_path_to_line_segments(path, num_segments2,
+                             lx1234, ly1234, lx234, ly234, lx34, ly34, x1234, y1234);
+    ok_path_to_line_segments(path, num_segments3,
+                             x1234, y1234, rx12, ry12, rx123, ry123, rx1234, ry1234);
+    ok_path_to_line_segments(path, num_segments4,
+                             rx1234, ry1234, rx234, ry234, rx34, ry34, x4, y4);
 }
 
 static void ok_path_flatten_if_needed(ok_path_t *path) {
@@ -876,8 +878,8 @@ static void ok_path_flatten_if_needed(ok_path_t *path) {
             double x;
             double y;
             if (path->flattened_segments.length == 0) {
-                x = 0;
-                y = 0;
+                x = 0.0;
+                y = 0.0;
             } else {
                 x = vector_last(&path->flattened_segments)->x;
                 y = vector_last(&path->flattened_segments)->y;
@@ -904,10 +906,10 @@ double ok_path_get_length(ok_path_t *path) {
 static double ok_path_wrap_to_plus_minus_pi(const double radians) {
     if (radians < -M_PI || radians > M_PI) {
         // Transform range to (0 to 1)
-        double new_angle = (radians + M_PI) / (2 * M_PI);
+        double new_angle = (radians + M_PI) / (2.0 * M_PI);
         new_angle -= floor(new_angle);
         // Transform back to (-pi to pi) range
-        return (M_PI * (new_angle * 2 - 1));
+        return (M_PI * (new_angle * 2.0 - 1.0));
     } else {
         return radians;
     }
@@ -917,7 +919,7 @@ static double ok_path_shortest_arc(const double from_radians, const double to_ra
     const double from_value = ok_path_wrap_to_plus_minus_pi(from_radians);
     const double to_value = ok_path_wrap_to_plus_minus_pi(to_radians);
     const double d1 = to_value - from_value;
-    const double d2 = from_value - to_value + 2 * M_PI;
+    const double d2 = from_value - to_value + 2.0 * M_PI;
     if (fabs(d1) < fabs(d2)) {
         return d1;
     } else {
@@ -931,13 +933,13 @@ void ok_path_get_location(ok_path_t *path, const double p, double *out_x, double
     const size_t count = path->flattened_segments.length;
     if (count == 0) {
         if (out_x) {
-            *out_x = 0;
+            *out_x = 0.0;
         }
         if (out_y) {
-            *out_y = 0;
+            *out_y = 0.0;
         }
         if (out_angle) {
-            *out_angle = 0;
+            *out_angle = 0.0;
         }
     } else {
         struct ok_path_flattened_segment *flattened_segments = path->flattened_segments.values;
@@ -967,7 +969,7 @@ void ok_path_get_location(ok_path_t *path, const double p, double *out_x, double
 
         struct ok_path_flattened_segment *s1 = &flattened_segments[p_low];
         struct ok_path_flattened_segment *s2 = &flattened_segments[p_high];
-        if (p_low == p_high || length == 0) {
+        if (p_low == p_high || length == 0.0) {
             if (out_x) {
                 *out_x = s1->x;
             }
