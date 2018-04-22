@@ -21,7 +21,7 @@ static int test_svg_parse() {
     // Test if the SVG path is identical to the programatically constructed path.
     const char *svg_path = "M 100,100"
                            "L100,200 "
-                           "h-100 "
+                           "h-100, " // Test superfluous comma
                            "v-100-100 " // Test no space or comma before negative number
                            "L0.25e-4,0.25E+2" // Test exponents
                            "M 0 0 a25,25 -30 0,1 50,-25 "
