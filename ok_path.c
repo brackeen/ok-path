@@ -107,6 +107,7 @@ enum ok_path_type {
     OK_PATH_MOVE_TO = 0,
     OK_PATH_LINE_TO,
     OK_PATH_CURVE_TO,
+    OK_PATH_CLOSE
 };
 
 struct ok_path_segment {
@@ -164,7 +165,16 @@ bool ok_path_equals(const ok_path_t *path1, const ok_path_t *path2) {
     struct ok_path_segment *segment1 = path1->path_segments.values;
     struct ok_path_segment *segment2 = path2->path_segments.values;
     for (size_t i = 0; i < path1->path_segments.length; i++) {
-        if (segment1->type != segment2->type) {
+        enum ok_path_type type1 = segment1->type;
+        enum ok_path_type type2 = segment2->type;
+        if (type1 == OK_PATH_CLOSE) {
+            type1 = OK_PATH_LINE_TO;
+        }
+        if (type2 == OK_PATH_CLOSE) {
+            type2 = OK_PATH_LINE_TO;
+        }
+
+        if (type1 != type2) {
             return false;
         }
         if (segment1->x != segment2->x || segment1->y != segment2->y) {
@@ -234,6 +244,15 @@ void ok_path_curve_to(ok_path_t *path, const double cx1, const double cy1,
     }
 }
 
+void ok_path_close(ok_path_t *path) {
+    struct ok_path_segment *segment = vector_push_new(&path->path_segments);
+    if (segment) {
+        segment->type = OK_PATH_CLOSE;
+        segment->x = path->subpath_origin_x;
+        segment->y = path->subpath_origin_y;
+    }
+}
+
 void ok_path_append(ok_path_t *path, const ok_path_t *path_to_append) {
     size_t count = path_to_append->path_segments.length;
     if (vector_ensure_capacity(&path->path_segments, count)) {
@@ -261,10 +280,6 @@ void ok_path_append_lines(ok_path_t *path, const double (*points)[2], const size
             points++;
         }
     }
-}
-
-void ok_path_close(ok_path_t *path) {
-    ok_path_line_to(path, path->subpath_origin_x, path->subpath_origin_y);
 }
 
 void ok_path_quad_curve_to(ok_path_t *path, const double cx, const double cy,
@@ -507,7 +522,7 @@ bool ok_path_append_svg(ok_path_t *path, const char *svg_path, char **out_error_
                 case 'z': {
                     curr_x = path->subpath_origin_x;
                     curr_y = path->subpath_origin_y;
-                    ok_path_line_to(path, curr_x, curr_y);
+                    ok_path_close(path);
                     break;
                 }
                 case 'M': {
