@@ -241,7 +241,7 @@ static double ok_path_last_y(const ok_path_t *path) {
 
 // MARK: Modifying paths
 
-void ok_path_move_to(ok_path_t *path, const double x, const double y) {
+void ok_path_move_to(ok_path_t *path, double x, double y) {
     struct ok_path_segment *segment = vector_push_new(&path->path_segments);
     if (segment) {
         segment->type = OK_PATH_MOVE_TO;
@@ -252,7 +252,7 @@ void ok_path_move_to(ok_path_t *path, const double x, const double y) {
     }
 }
 
-void ok_path_line_to(ok_path_t *path, const double x, const double y) {
+void ok_path_line_to(ok_path_t *path, double x, double y) {
     struct ok_path_segment *segment = vector_push_new(&path->path_segments);
     if (segment) {
         segment->type = OK_PATH_LINE_TO;
@@ -261,8 +261,7 @@ void ok_path_line_to(ok_path_t *path, const double x, const double y) {
     }
 }
 
-void ok_path_quad_curve_to(ok_path_t *path, const double cx, const double cy,
-                           const double x, const double y) {
+void ok_path_quad_curve_to(ok_path_t *path, double cx, double cy, double x, double y) {
     struct ok_path_segment *segment = vector_push_new(&path->path_segments);
     if (segment) {
         segment->type = OK_PATH_QUAD_CURVE_TO;
@@ -273,8 +272,8 @@ void ok_path_quad_curve_to(ok_path_t *path, const double cx, const double cy,
     }
 }
 
-void ok_path_curve_to(ok_path_t *path, const double cx1, const double cy1,
-                      const double cx2, const double cy2, const double x, const double y) {
+void ok_path_curve_to(ok_path_t *path, double cx1, double cy1, double cx2, double cy2,
+                      double x, double y) {
     struct ok_path_segment *segment = vector_push_new(&path->path_segments);
     if (segment) {
         segment->type = OK_PATH_CUBIC_CURVE_TO;
@@ -309,7 +308,7 @@ void ok_path_append(ok_path_t *path, const ok_path_t *path_to_append) {
     }
 }
 
-void ok_path_append_lines(ok_path_t *path, const double (*points)[2], const size_t num_points) {
+void ok_path_append_lines(ok_path_t *path, const double (*points)[2], size_t num_points) {
     struct vector_of_path_segments *path_segments = &path->path_segments;
     if (num_points > 0 && vector_ensure_capacity(path_segments, num_points)) {
         ok_path_move_to(path, (*points)[0], (*points)[1]);
@@ -330,9 +329,9 @@ void ok_path_arc_to(ok_path_t *path, double radius, bool large_arc, bool sweep,
     ok_path_elliptical_arc_to(path, radius, radius, 0.0, large_arc, sweep, x, y);
 }
 
-void ok_path_elliptical_arc_to(ok_path_t *path, const double radius_x, const double radius_y,
-                               const double rotation_radians, const bool large_arc,
-                               const bool sweep, const double x, const double y) {
+void ok_path_elliptical_arc_to(ok_path_t *path, double radius_x, double radius_y,
+                               double rotation_radians, bool large_arc,
+                               bool sweep, double x, double y) {
     // Convert arc to a series of bezier curves.
     // Interface is the same as the SVG spec, except xAxisRotation is in radians, not degrees.
     // See http://www.w3.org/TR/SVG/paths.html#PathDataEllipticalArcCommands
@@ -808,10 +807,8 @@ static int ok_path_num_segments(double x0, double y0, double x1, double y1,
 
 static void ok_path_to_line_segments(ok_path_t *path, enum ok_path_segment_type type,
                                      int num_segments,
-                                     const double x0, const double y0,
-                                     const double x1, const double y1,
-                                     const double x2, const double y2,
-                                     const double x3, const double y3) {
+                                     double x0, double y0, double x1, double y1,
+                                     double x2, double y2, double x3, double y3) {
     const double t = 1.0 / num_segments;
     const double t2 = t * t;
     const double t3 = t2 * t;
@@ -850,10 +847,8 @@ static void ok_path_to_line_segments(ok_path_t *path, enum ok_path_segment_type 
 }
 
 static void ok_path_flatten_curve_to(ok_path_t *path, enum ok_path_segment_type type,
-                                     const double x1, const double y1,
-                                     const double x2, const double y2,
-                                     const double x3, const double y3,
-                                     const double x4, const double y4) {
+                                     double x1, double y1, double x2, double y2,
+                                     double x3, double y3, double x4, double y4) {
     // First division
     const double x12 = (x1 + x2) / 2;
     const double y12 = (y1 + y2) / 2;
@@ -961,7 +956,7 @@ double ok_path_get_length(ok_path_t *path) {
     }
 }
 
-static double ok_path_wrap_to_plus_minus_pi(const double radians) {
+static double ok_path_wrap_to_plus_minus_pi(double radians) {
     if (radians < -M_PI || radians > M_PI) {
         // Transform range to (0 to 1)
         double new_angle = (radians + M_PI) / (2.0 * M_PI);
@@ -973,7 +968,7 @@ static double ok_path_wrap_to_plus_minus_pi(const double radians) {
     }
 }
 
-static double ok_path_shortest_arc(const double from_radians, const double to_radians) {
+static double ok_path_shortest_arc(double from_radians, double to_radians) {
     const double from_value = ok_path_wrap_to_plus_minus_pi(from_radians);
     const double to_value = ok_path_wrap_to_plus_minus_pi(to_radians);
     const double d1 = to_value - from_value;
@@ -985,7 +980,7 @@ static double ok_path_shortest_arc(const double from_radians, const double to_ra
     }
 }
 
-void ok_path_get_location(ok_path_t *path, const double p, double *out_x, double *out_y,
+void ok_path_get_location(ok_path_t *path, double p, double *out_x, double *out_y,
                           double *out_angle) {
     ok_path_flatten_if_needed(path);
     const size_t count = path->flattened_segments.length;
