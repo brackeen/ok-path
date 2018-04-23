@@ -43,20 +43,8 @@
 #define vector_of(type) \
     { type *values; size_t length; size_t capacity; }
 
-#define vector_init(v) \
-    memset((v), 0, sizeof(*(v)))
-
 #define vector_free(v) \
     free((v)->values)
-
-#define vector_clear(v) \
-    (v)->length = 0
-
-#define vector_begin(v) \
-    ((v)->values)
-
-#define vector_end(v) \
-    ((v)->values + (v)->length)
 
 #define vector_last(v) \
     ((v)->values + ((v)->length - 1))
@@ -64,24 +52,8 @@
 #define vector_at(v, i) \
     ((v)->values + (i))
 
-#define vector_push(v, value) \
-    (vector_ensure_capacity(v, 1) ? ((v)->values[((v)->length++)] = (value), 1) : 0)
-
 #define vector_push_new(v) \
     (vector_ensure_capacity(v, 1) ? ((v)->values + ((v)->length++)) : NULL)
-
-#define vector_push_all(v, v2) \
-    (vector_ensure_capacity(v, (v2)->length) ? \
-    (memcpy((v)->values + (v)->length, (v2)->values, sizeof(*(v)->values) * (v2)->length), \
-    ((v)->length += (v2)->length)) : 0)
-
-#define vector_foreach(var, v) \
-    for (size_t keep = 1, i = 0, len = (v)->length; keep && i < len; keep = !keep, i++) \
-    for (var = *((v)->values + i); keep; keep = !keep)
-
-#define vector_foreach_ptr(var, v) \
-    for (size_t keep = 1, i = 0, len = (v)->length; keep && i < len; keep = !keep, i++) \
-    for (var = (v)->values + i; keep; keep = !keep)
 
 #define vector_ensure_capacity(v, additional_count) \
     (((v)->length + (size_t)(additional_count) <= (v)->capacity) ? true : \
