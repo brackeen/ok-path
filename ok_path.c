@@ -318,131 +318,134 @@ void ok_path_elliptical_arc_to(ok_path_t *path, double radius_x, double radius_y
     // See http://www.w3.org/TR/SVG/implnote.html#ArcImplementationNotes
     if (radius_x == 0.0 || radius_y == 0.0) {
         ok_path_line_to(path, x, y);
-    } else {
-        const double curr_x = ok_path_last_x(path);
-        const double curr_y = ok_path_last_y(path);
-        const double end_x = x;
-        const double end_y = y;
-        const double dx2 = (curr_x - end_x) / 2.0;
-        const double dy2 = (curr_y - end_y) / 2.0;
-        const double cos_a = cos(rotation_radians);
-        const double sin_a = sin(rotation_radians);
+        return;
+    }
+    const double curr_x = ok_path_last_x(path);
+    const double curr_y = ok_path_last_y(path);
+    const double end_x = x;
+    const double end_y = y;
+    const double dx2 = (curr_x - end_x) / 2.0;
+    const double dy2 = (curr_y - end_y) / 2.0;
+    const double cos_a = cos(rotation_radians);
+    const double sin_a = sin(rotation_radians);
 
-        const double x1p = cos_a * dx2 + sin_a * dy2;
-        const double y1p = -sin_a * dx2 + cos_a * dy2;
-        const double x1p2 = x1p * x1p;
-        const double y1p2 = y1p * y1p;
+    const double x1p = cos_a * dx2 + sin_a * dy2;
+    const double y1p = -sin_a * dx2 + cos_a * dy2;
+    const double x1p2 = x1p * x1p;
+    const double y1p2 = y1p * y1p;
 
-        // Correct out-of-range radii
-        double rx = fabs(radius_x);
-        double ry = fabs(radius_y);
-        double rx2 = rx * rx;
-        double ry2 = ry * ry;
-        const double v = x1p2 / rx2 + y1p2 / ry2;
-        if (v > 1.0) {
-            const double v_sq = sqrt(v);
-            rx = v_sq * rx;
-            ry = v_sq * ry;
-            rx2 = rx * rx;
-            ry2 = ry * ry;
+    // Correct out-of-range radii
+    double rx = fabs(radius_x);
+    double ry = fabs(radius_y);
+    double rx2 = rx * rx;
+    double ry2 = ry * ry;
+    const double v = x1p2 / rx2 + y1p2 / ry2;
+    if (v > 1.0) {
+        const double v_sq = sqrt(v);
+        rx = v_sq * rx;
+        ry = v_sq * ry;
+        rx2 = rx * rx;
+        ry2 = ry * ry;
+    }
+
+    // Find center point (cx, cy)
+    double S = sqrt(fmax(0, (rx2 * ry2 - rx2 * y1p2 - ry2 * x1p2) / (rx2 * y1p2 + ry2 * x1p2)));
+    if (large_arc == sweep) {
+        S = -S;
+    }
+    const double cxp = S * rx * y1p / ry;
+    const double cyp = -S * ry * x1p / rx;
+    const double cx = cos_a * cxp - sin_a * cyp + (curr_x + end_x) / 2.0;
+    const double cy = sin_a * cxp + cos_a * cyp + (curr_y + end_y) / 2.0;
+
+    // Find start_angle and end_angle
+    const double ux = (x1p - cxp) / rx;
+    const double uy = (y1p - cyp) / ry;
+    const double vx = (-x1p - cxp) / rx;
+    const double vy = (-y1p - cyp) / ry;
+    double n = sqrt(ux * ux + uy * uy);
+    double p = ux;
+    double angle_start = acos(p / n);
+    if (uy < 0.0) {
+        angle_start = -angle_start;
+    }
+    n = sqrt((ux * ux + uy * uy) * (vx * vx + vy * vy));
+    p = ux * vx + uy * vy;
+    double angle_extent = acos(p / n);
+    if (ux * vy - uy * vx < 0.0) {
+        angle_extent = -angle_extent;
+    }
+    if (!sweep && angle_extent > 0.0) {
+        angle_extent -= 2.0 * M_PI;
+    } else if (sweep && angle_extent < 0.0) {
+        angle_extent += 2.0 * M_PI;
+    }
+    if (angle_extent == 0.0) {
+        ok_path_line_to(path, x, y);
+        return;
+    }
+    double angle_end = angle_start + angle_extent;
+
+    // Create one bezier for each quadrant
+    double cos_eta_b = cos(angle_start);
+    double sin_eta_b = sin(angle_start);
+    double a_cos_eta_b = rx * cos_eta_b;
+    double b_sin_eta_b = ry * sin_eta_b;
+    double a_sin_eta_b = rx * sin_eta_b;
+    double b_cos_eta_b = ry * cos_eta_b;
+    double x_b = cx + a_cos_eta_b * cos_a - b_sin_eta_b * sin_a;
+    double y_b = cy + a_cos_eta_b * sin_a + b_sin_eta_b * cos_a;
+    double x_b_dot = -a_sin_eta_b * cos_a - b_cos_eta_b * sin_a;
+    double y_b_dot = -a_sin_eta_b * sin_a + b_cos_eta_b * cos_a;
+
+    double prev_angle = angle_start;
+    double d = (sweep ? M_PI_2 : -M_PI_2);
+    bool done = false;
+    int quad = 0;
+    while (!done) {
+        double angle = prev_angle + d;
+        if ((++quad == 4) || (sweep && angle >= angle_end) || (!sweep && angle <= angle_end)) {
+            angle = angle_end;
+            done = true;
         }
 
-        // Find center point (cx, cy)
-        double S = sqrt(fmax(0, (rx2 * ry2 - rx2 * y1p2 - ry2 * x1p2) / (rx2 * y1p2 + ry2 * x1p2)));
-        if (large_arc == sweep) {
-            S = -S;
+        double da = angle - prev_angle;
+        double alpha = 4.0 * tan(da / 4.0) / 3.0;
+        prev_angle = angle;
+
+        // Alternative alpha from: http://www.spaceroots.org/documents/ellipse/
+        // XXX: test for very large arcs to see which alpha is better
+        // double t = tan(da / 2.0);
+        // double alpha = sin(da) * (fsqrt(4.0 + 3.0 * t * t) - 1.0) / 3.0;
+
+        double x_a = x_b;
+        double y_a = y_b;
+        double x_a_dot = x_b_dot;
+        double y_a_dot = y_b_dot;
+
+        cos_eta_b = cos(angle);
+        sin_eta_b = sin(angle);
+
+        a_cos_eta_b = rx * cos_eta_b;
+        b_sin_eta_b = ry * sin_eta_b;
+        a_sin_eta_b = rx * sin_eta_b;
+        b_cos_eta_b = ry * cos_eta_b;
+
+        x_b_dot = -a_sin_eta_b * cos_a - b_cos_eta_b * sin_a;
+        y_b_dot = -a_sin_eta_b * sin_a + b_cos_eta_b * cos_a;
+
+        if (done) {
+            x_b = end_x;
+            y_b = end_y;
+        } else {
+            x_b = cx + a_cos_eta_b * cos_a - b_sin_eta_b * sin_a;
+            y_b = cy + a_cos_eta_b * sin_a + b_sin_eta_b * cos_a;
         }
-        const double cxp = S * rx * y1p / ry;
-        const double cyp = -S * ry * x1p / rx;
-        const double cx = cos_a * cxp - sin_a * cyp + (curr_x + end_x) / 2.0;
-        const double cy = sin_a * cxp + cos_a * cyp + (curr_y + end_y) / 2.0;
 
-        // Find start_angle and end_angle
-        const double ux = (x1p - cxp) / rx;
-        const double uy = (y1p - cyp) / ry;
-        const double vx = (-x1p - cxp) / rx;
-        const double vy = (-y1p - cyp) / ry;
-        double n = sqrt(ux * ux + uy * uy);
-        double p = ux;
-        double angle_start = acos(p / n);
-        if (uy < 0.0) {
-            angle_start = -angle_start;
-        }
-        n = sqrt((ux * ux + uy * uy) * (vx * vx + vy * vy));
-        p = ux * vx + uy * vy;
-        double angle_extent = acos(p / n);
-        if (ux * vy - uy * vx < 0.0) {
-            angle_extent = -angle_extent;
-        }
-        if (!sweep && angle_extent > 0.0) {
-            angle_extent -= 2.0 * M_PI;
-        } else if (sweep && angle_extent < 0.0) {
-            angle_extent += 2.0 * M_PI;
-        }
-        double angle_end = angle_start + angle_extent;
-
-        // Create one bezier for each quadrant
-        double cos_eta_b = cos(angle_start);
-        double sin_eta_b = sin(angle_start);
-        double a_cos_eta_b = rx * cos_eta_b;
-        double b_sin_eta_b = ry * sin_eta_b;
-        double a_sin_eta_b = rx * sin_eta_b;
-        double b_cos_eta_b = ry * cos_eta_b;
-        double x_b = cx + a_cos_eta_b * cos_a - b_sin_eta_b * sin_a;
-        double y_b = cy + a_cos_eta_b * sin_a + b_sin_eta_b * cos_a;
-        double x_b_dot = -a_sin_eta_b * cos_a - b_cos_eta_b * sin_a;
-        double y_b_dot = -a_sin_eta_b * sin_a + b_cos_eta_b * cos_a;
-
-        double s = angle_start;
-        double d = (sweep ? M_PI_2 : -M_PI_2);
-        while (true) {
-            if ((sweep && s >= angle_end) || (!sweep && s <= angle_end)) {
-                break;
-            }
-
-            double e = s + d;
-            if ((sweep && e > angle_end) || (!sweep && e < angle_end)) {
-                e = angle_end;
-            }
-
-            double da = e - s;
-            double alpha = 4.0 * tan(da / 4.0) / 3.0;
-
-            // Alternative alpha from: http://www.spaceroots.org/documents/ellipse/
-            // XXX: test for very large arcs to see which alpha is better
-            // double t = tan(da / 2.0);
-            // double alpha = sin(da) * (fsqrt(4.0 + 3.0 * t * t) - 1.0) / 3.0;
-
-            double x_a = x_b;
-            double y_a = y_b;
-            double x_a_dot = x_b_dot;
-            double y_a_dot = y_b_dot;
-
-            cos_eta_b = cos(e);
-            sin_eta_b = sin(e);
-
-            a_cos_eta_b = rx * cos_eta_b;
-            b_sin_eta_b = ry * sin_eta_b;
-            a_sin_eta_b = rx * sin_eta_b;
-            b_cos_eta_b = ry * cos_eta_b;
-
-            x_b_dot = -a_sin_eta_b * cos_a - b_cos_eta_b * sin_a;
-            y_b_dot = -a_sin_eta_b * sin_a + b_cos_eta_b * cos_a;
-
-            if (e == angle_end) {
-                x_b = end_x;
-                y_b = end_y;
-            } else {
-                x_b = cx + a_cos_eta_b * cos_a - b_sin_eta_b * sin_a;
-                y_b = cy + a_cos_eta_b * sin_a + b_sin_eta_b * cos_a;
-            }
-
-            ok_path_curve_to(path,
-                             x_a + alpha * x_a_dot, y_a + alpha * y_a_dot,
-                             x_b - alpha * x_b_dot, y_b - alpha * y_b_dot,
-                             x_b, y_b);
-            s += d;
-        }
+        ok_path_curve_to(path,
+                         x_a + alpha * x_a_dot, y_a + alpha * y_a_dot,
+                         x_b - alpha * x_b_dot, y_b - alpha * y_b_dot,
+                         x_b, y_b);
     }
 }
 
