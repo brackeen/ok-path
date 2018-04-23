@@ -103,19 +103,11 @@ static bool vector_realloc(void **values, size_t min_capacity, size_t element_si
 
 // MARK: Path
 
-enum ok_path_type {
-    OK_PATH_MOVE_TO = 0,
-    OK_PATH_LINE_TO,
-    OK_PATH_QUAD_CURVE_TO,
-    OK_PATH_CUBIC_CURVE_TO,
-    OK_PATH_CLOSE
-};
-
 #define ok_path_type_is_curve(type) ((type) == OK_PATH_QUAD_CURVE_TO || \
                                      (type) == OK_PATH_CUBIC_CURVE_TO)
 
 struct ok_path_segment {
-    enum ok_path_type type;
+    enum ok_path_segment_type type;
     double x, y;
 
     // Control points. Valid if type is CURVE_TO, otherwise these are undefined.
@@ -125,7 +117,7 @@ struct ok_path_segment {
 
 struct ok_path_flattened_segment {
     // The type of command this line segment originated from.
-    enum ok_path_type type;
+    enum ok_path_segment_type type;
 
     // Point location.
     double x, y;
@@ -169,8 +161,8 @@ bool ok_path_equals(const ok_path_t *path1, const ok_path_t *path2) {
     struct ok_path_segment *segment1 = path1->path_segments.values;
     struct ok_path_segment *segment2 = path2->path_segments.values;
     for (size_t i = 0; i < path1->path_segments.length; i++) {
-        enum ok_path_type type1 = segment1->type;
-        enum ok_path_type type2 = segment2->type;
+        enum ok_path_segment_type type1 = segment1->type;
+        enum ok_path_segment_type type2 = segment2->type;
         if (type1 == OK_PATH_CLOSE) {
             type1 = OK_PATH_LINE_TO;
         }
@@ -207,6 +199,28 @@ bool ok_path_equals(const ok_path_t *path1, const ok_path_t *path2) {
         segment2++;
     }
     return true;
+}
+
+size_t ok_path_segment_count(const ok_path_t *path) {
+    return path->path_segments.length;
+}
+
+void ok_path_segment_get(const ok_path_t *path, size_t index, enum ok_path_segment_type *out_type,
+                         double *out_cx1, double *out_cy1, double *out_cx2, double *out_cy2,
+                         double *out_x, double *out_y) {
+    struct ok_path_segment *segment = path->path_segments.values + index;
+    *out_type = segment->type;
+    *out_x = segment->x;
+    *out_y = segment->y;
+    if (segment->type == OK_PATH_QUAD_CURVE_TO) {
+        *out_cx1 = segment->cx1;
+        *out_cy1 = segment->cy1;
+    } else if (segment->type == OK_PATH_CUBIC_CURVE_TO) {
+        *out_cx1 = segment->cx1;
+        *out_cy1 = segment->cy1;
+        *out_cx2 = segment->cx2;
+        *out_cy2 = segment->cy2;
+    }
 }
 
 static double ok_path_last_x(const ok_path_t *path) {
@@ -715,8 +729,8 @@ bool ok_path_append_svg(ok_path_t *path, const char *svg_path, char **out_error_
 
 // MARK: Path flattening
 
-static void ok_path_add_flattened_segment(ok_path_t *path, const enum ok_path_type type,
-                                          const double x, const double y) {
+static void ok_path_add_flattened_segment(ok_path_t *path, enum ok_path_segment_type type,
+                                          double x, double y) {
     double dx;
     double dy;
     double prev_length;
@@ -792,7 +806,8 @@ static int ok_path_num_segments(double x0, double y0, double x1, double y1,
     return num_segments;
 }
 
-static void ok_path_to_line_segments(ok_path_t *path, enum ok_path_type type, int num_segments,
+static void ok_path_to_line_segments(ok_path_t *path, enum ok_path_segment_type type,
+                                     int num_segments,
                                      const double x0, const double y0,
                                      const double x1, const double y1,
                                      const double x2, const double y2,
@@ -834,7 +849,7 @@ static void ok_path_to_line_segments(ok_path_t *path, enum ok_path_type type, in
     ok_path_add_flattened_segment(path, type, x3, y3);
 }
 
-static void ok_path_flatten_curve_to(ok_path_t *path, enum ok_path_type type,
+static void ok_path_flatten_curve_to(ok_path_t *path, enum ok_path_segment_type type,
                                      const double x1, const double y1,
                                      const double x2, const double y2,
                                      const double x3, const double y3,

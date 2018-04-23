@@ -30,6 +30,14 @@
 extern "C" {
 #endif
 
+enum ok_path_segment_type {
+    OK_PATH_MOVE_TO = 0,
+    OK_PATH_LINE_TO,
+    OK_PATH_QUAD_CURVE_TO,
+    OK_PATH_CUBIC_CURVE_TO,
+    OK_PATH_CLOSE
+};
+
 /**
  * An `ok_path_t` is a series of line segments and Bézier curves.
  */
@@ -170,6 +178,35 @@ void ok_path_close(ok_path_t *path);
  * @return `true` if both paths contain the same sequence of path segments.
  */
 bool ok_path_equals(const ok_path_t *path1, const ok_path_t *path2);
+
+/**
+ * Gets the number of segments in the path. See #ok_path_segment_get().
+ *
+ * @param path The path.
+ * @return The number of segments.
+ */
+size_t ok_path_segment_count(const ok_path_t *path);
+
+/**
+ * Gets a sepecific segments in the path.
+ *
+ * @param path The path.
+ * @param segment The segment to get.
+ * @param[out] out_type The segment type.
+ * @param[out] out_cx1 The x location of the first control point. This value is only set if the
+ *     segment type is #OK_PATH_QUAD_CURVE_TO or #OK_PATH_CUBIC_CURVE_TO.
+ * @param[out] out_cy1 The y location of the first control point. This value is only set if the
+ *     segment type is #OK_PATH_QUAD_CURVE_TO or #OK_PATH_CUBIC_CURVE_TO.
+ * @param[out] out_cx2 The x location of the second control point. This value is only set if the
+ *     segment type is #OK_PATH_CUBIC_CURVE_TO.
+ * @param[out] out_cy2 The y location of the second control point. This value is only set if the
+ *     segment type is #OK_PATH_CUBIC_CURVE_TO.
+ * @param[out] out_x The x location of the segment's end point.
+ * @param[out] out_y The y location of the segment's end point.
+ */
+void ok_path_segment_get(const ok_path_t *path, size_t segment, enum ok_path_segment_type *out_type,
+                         double *out_cx1, double *out_cy1, double *out_cx2, double *out_cy2,
+                         double *out_x, double *out_y);
 
 /**
  * Gets the length of the path.

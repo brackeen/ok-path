@@ -72,6 +72,73 @@ static int test_svg_parse() {
     return 0;
 }
 
+static int test_iteration() {
+    ok_path_t *path1 = ok_path_alloc();
+    ok_path_t *path2 = ok_path_alloc();
+
+    ok_path_move_to(path2, 100, 100);
+    ok_path_line_to(path2, 100, 200);
+    ok_path_line_to(path2, 0, 200);
+    ok_path_line_to(path2, 0, 100);
+    ok_path_line_to(path2, 0, 0);
+    ok_path_line_to(path2, 0.25e-4, 0.25e+2);
+    ok_path_move_to(path2, 0, 0);
+    ok_path_elliptical_arc_to(path2, 25, 25, -30 * M_PI / 180, false, true, 50, -25);
+    ok_path_move_to(path2, 200, 300);
+    ok_path_quad_curve_to(path2, 400, 50, 600, 300);
+    ok_path_quad_curve_to(path2, 800, 550, 1000, 300);
+    ok_path_move_to(path2, 100, 200);
+    ok_path_curve_to(path2, 100, 100, 250, 100, 250, 200);
+    ok_path_curve_to(path2, 250, 300, 400, 300, 400, 200);
+    ok_path_close(path2);
+
+    size_t count = ok_path_segment_count(path2);
+    for (size_t i = 0; i < count; i++) {
+        enum ok_path_segment_type type;
+        double cx1, cy1;
+        double cx2, cy2;
+        double x, y;
+        ok_path_segment_get(path2, i, &type, &cx1, &cy1, &cx2, &cy2, &x, &y);
+
+        switch (type) {
+            case OK_PATH_MOVE_TO:
+                ok_path_move_to(path1, x, y);
+                break;
+            case OK_PATH_LINE_TO:
+                ok_path_line_to(path1, x, y);
+                break;
+            case OK_PATH_QUAD_CURVE_TO:
+                ok_path_quad_curve_to(path1, cx1, cy1, x, y);
+                break;
+            case OK_PATH_CUBIC_CURVE_TO:
+                ok_path_curve_to(path1, cx1, cy1, cx2, cy2, x, y);
+                break;
+            case OK_PATH_CLOSE:
+                ok_path_close(path1);
+                break;
+        }
+    }
+
+    if (!ok_path_equals(path1, path2)) {
+        printf("Failure: %s: Paths not equal\n", __func__);
+        ok_path_free(path1);
+        ok_path_free(path2);
+        return 1;
+    }
+
+    if (ok_path_get_length(path1) != ok_path_get_length(path2)) {
+        printf("Failure: %s: Path lengths not equal\n", __func__);
+        ok_path_free(path1);
+        ok_path_free(path2);
+        return 1;
+    }
+
+    printf("Success: %s\n", __func__);
+    ok_path_free(path1);
+    ok_path_free(path2);
+    return 0;
+}
+
 static int test_append_lines() {
     ok_path_t *path1 = ok_path_alloc();
     ok_path_t *path2;
@@ -114,5 +181,5 @@ static int test_append_lines() {
 }
 
 int main() {
-    return test_svg_parse() || test_append_lines();
+    return test_svg_parse() || test_iteration() || test_append_lines();
 }
