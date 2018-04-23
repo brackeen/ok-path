@@ -126,6 +126,14 @@ void ok_path_free(ok_path_t *path) {
     free(path);
 }
 
+void ok_path_reset(ok_path_t *path) {
+    path->subpath_origin_x = 0.0;
+    path->subpath_origin_y = 0.0;
+    path->path_segments.length = 0;
+    path->flattened_segments.length = 0;
+    path->num_segments_flattened = 0;
+}
+
 bool ok_path_equals(const ok_path_t *path1, const ok_path_t *path2) {
     if (path1->path_segments.length != path2->path_segments.length) {
         return false;

@@ -170,6 +170,11 @@ bool ok_path_append_svg(ok_path_t *path, const char *svg_path, char **out_error_
  */
 void ok_path_close(ok_path_t *path);
 
+/**
+ * Remove all segments from the path.
+ */
+void ok_path_reset(ok_path_t *path);
+
 // MARK: Getting information about paths
 
 /**

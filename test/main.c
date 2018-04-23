@@ -161,11 +161,10 @@ static int test_append_lines() {
         ok_path_free(path2);
         return 1;
     }
-    ok_path_free(path2);
 
     // Using 1D array
     double points2[] = {0, 0, 10, 20, 40, 20, 30, 10, 50, 0, 0, 0};
-    path2 = ok_path_alloc();
+    ok_path_reset(path2);
     ok_path_append_lines(path2, points, sizeof(points2) / (sizeof(*points2) * 2));
     if (!ok_path_equals(path1, path2)) {
         printf("Failure: %s: Paths not equal\n", __func__);
@@ -173,10 +172,10 @@ static int test_append_lines() {
         ok_path_free(path2);
         return 1;
     }
-    ok_path_free(path2);
 
     printf("Success: %s\n", __func__);
     ok_path_free(path1);
+    ok_path_free(path2);
     return 0;
 }
 
