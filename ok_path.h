@@ -43,6 +43,8 @@ enum ok_path_segment_type {
  */
 typedef struct ok_path ok_path_t;
 
+typedef struct ok_flattened_path ok_flattened_path_t;
+
 // MARK: Creating paths
 
 /**
@@ -213,15 +215,19 @@ void ok_path_segment_get(const ok_path_t *path, size_t segment, enum ok_path_seg
                          double *out_cx1, double *out_cy1, double *out_cx2, double *out_cy2,
                          double *out_x, double *out_y);
 
+// MARK: Path flattening
+
+ok_flattened_path_t *ok_path_flatten(const ok_path_t *path);
+
+void ok_flattened_path_free(ok_flattened_path_t *path);
+
 /**
  * Gets the length of the path.
- * The path is flattened if it has not been flattened yet.
  */
-double ok_path_get_length(ok_path_t *path);
+double ok_flattened_path_length(const ok_flattened_path_t *path);
 
 /**
  * Gets the location on the path at location `p`, where `p` is a value from 0.0 to 1.0.
- * The path is flattened if it has not been flattened yet.
  *
  * @param path The path.
  * @param p The location on the path, from 0.0 to 1.0.
@@ -229,8 +235,8 @@ double ok_path_get_length(ok_path_t *path);
  * @param[out] out_y The pointer where the y location should be stored. May be `NULL`.
  * @param[out] out_angle The pointer where the angle, in radians, should be stored. May be `NULL`.
  */
-void ok_path_get_location(ok_path_t *path, double p, double *out_x, double *out_y,
-                          double *out_angle);
+void ok_flattened_path_location(const ok_flattened_path_t *path, double p,
+                                double *out_x, double *out_y, double *out_angle);
 
 #ifdef __cplusplus
 }

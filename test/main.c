@@ -59,13 +59,6 @@ static int test_svg_parse() {
         return 1;
     }
 
-    if (ok_path_get_length(path1) != ok_path_get_length(path2)) {
-        printf("Failure: %s: Path lengths not equal\n", __func__);
-        ok_path_free(path1);
-        ok_path_free(path2);
-        return 1;
-    }
-
     printf("Success: %s\n", __func__);
     ok_path_free(path1);
     ok_path_free(path2);
@@ -126,13 +119,6 @@ static int test_iteration() {
         return 1;
     }
 
-    if (ok_path_get_length(path1) != ok_path_get_length(path2)) {
-        printf("Failure: %s: Path lengths not equal\n", __func__);
-        ok_path_free(path1);
-        ok_path_free(path2);
-        return 1;
-    }
-
     printf("Success: %s\n", __func__);
     ok_path_free(path1);
     ok_path_free(path2);
@@ -179,6 +165,31 @@ static int test_append_lines() {
     return 0;
 }
 
+static int test_flatten() {
+    ok_path_t *path = ok_path_alloc();
+
+    char *error;
+
+    const char *svg_path = "M 100,100 L100,200 h-100 v-100-100 L0.25e-4,0.25E+2"
+        "M 0 0 a25,25 -30 0,1 50,-25 M 200,300 Q400,50 600,300 T1000,300 M 100,200 "
+        "C100,100 250,100 250,200 S400,300 400,200 Z";
+
+    if (!ok_path_append_svg(path, svg_path, &error)) {
+        printf("Failure: %s: SVG parse error: %s\n", error, __func__);
+        ok_path_free(path);
+        return 1;
+    }
+
+    ok_flattened_path_t *flattened_path = ok_path_flatten(path);
+    ok_path_free(path);
+
+    // TODO: Test flattened path
+
+    printf("Success: %s\n", __func__);
+    ok_flattened_path_free(flattened_path);
+    return 0;
+}
+
 int main() {
-    return test_svg_parse() || test_iteration() || test_append_lines();
+    return test_svg_parse() || test_iteration() || test_append_lines() || test_flatten();
 }
