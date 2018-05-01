@@ -43,6 +43,8 @@ enum ok_path_segment_type {
  */
 typedef struct ok_path ok_path_t;
 
+typedef uintptr_t ok_path_iterator_t;
+
 typedef struct ok_flattened_path ok_flattened_path_t;
 
 // MARK: Creating paths
@@ -187,18 +189,10 @@ void ok_path_reset(ok_path_t *path);
 bool ok_path_equals(const ok_path_t *path1, const ok_path_t *path2);
 
 /**
- * Gets the number of segments in the path. See #ok_path_segment_get().
- *
- * @param path The path.
- * @return The number of segments.
- */
-size_t ok_path_segment_count(const ok_path_t *path);
-
-/**
  * Gets a sepecific segments in the path.
  *
  * @param path The path.
- * @param segment The segment to get.
+ * @param iterator The iterator. Set to 0 to start at the beginning
  * @param[out] out_type The segment type.
  * @param[out] out_cx1 The x location of the first control point. This value is only set if the
  *     segment type is #OK_PATH_QUAD_CURVE_TO or #OK_PATH_CUBIC_CURVE_TO.
@@ -210,10 +204,13 @@ size_t ok_path_segment_count(const ok_path_t *path);
  *     segment type is #OK_PATH_CUBIC_CURVE_TO.
  * @param[out] out_x The x location of the segment's end point.
  * @param[out] out_y The y location of the segment's end point.
+ * @return `true` if the next segment is returned, `false` if there are no remaining semennts in
+ * the parh.
  */
-void ok_path_segment_get(const ok_path_t *path, size_t segment, enum ok_path_segment_type *out_type,
-                         double *out_cx1, double *out_cy1, double *out_cx2, double *out_cy2,
-                         double *out_x, double *out_y);
+bool ok_path_segment_next(const ok_path_t *path, ok_path_iterator_t *iterator,
+                          enum ok_path_segment_type *out_type,
+                          double *out_cx1, double *out_cy1, double *out_cx2, double *out_cy2,
+                          double *out_x, double *out_y);
 
 // MARK: Path flattening
 
