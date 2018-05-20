@@ -939,7 +939,33 @@ ok_flattened_path_t *ok_path_flatten(const ok_path_t *path) {
     }
 }
 
-// MARK: Path querying
+// MARK: Flattened path querying
+
+size_t ok_flattened_path_count(ok_flattened_path_t *path) {
+    return path->segments.length;
+}
+
+void ok_flattened_path_get(ok_flattened_path_t *path, size_t index,
+                           enum ok_path_segment_type *out_type, double *out_x, double *out_y,
+                           double *out_length_to, double *out_angle_to) {
+    struct ok_path_flattened_segment *segment = path->segments.values + index;
+    if (out_type) {
+        *out_type = segment->type;
+    }
+    if (out_x) {
+        *out_x = segment->x;
+    }
+    if (out_y) {
+        *out_y = segment->y;
+    }
+    // TODO: This may change if the path was flattened without length/angle data
+    if (out_length_to) {
+        *out_length_to = segment->length_to;
+    }
+    if (out_angle_to) {
+        *out_angle_to = segment->angle_to;
+    }
+}
 
 double ok_flattened_path_length(const ok_flattened_path_t *path) {
     if (path->segments.length > 0) {

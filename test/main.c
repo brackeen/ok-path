@@ -168,6 +168,10 @@ static int test_flatten() {
 
     char *error;
 
+    const double start_x = 100;
+    const double start_y = 100;
+    const double end_x = 100;
+    const double end_y = 200;
     const char *svg_path = "M 100,100 L100,200 h-100 v-100-100 L0.25e-4,0.25E+2"
         "M 0 0 a25,25 -30 0,1 50,-25 M 200,300 Q400,50 600,300 T1000,300 M 100,200 "
         "C100,100 250,100 250,200 S400,300 400,200 Z";
@@ -181,7 +185,32 @@ static int test_flatten() {
     ok_flattened_path_t *flattened_path = ok_path_flatten(path);
     ok_path_free(path);
 
-    // TODO: Test flattened path
+    double x, y;
+    size_t count = ok_flattened_path_count(flattened_path);
+    ok_flattened_path_get(flattened_path, 0, NULL, &x, &y, NULL, NULL);
+    if (x != start_x || y != start_y) {
+        printf("Failure: Flattened path error (first): %s\n", __func__);
+        ok_flattened_path_free(flattened_path);
+        return 1;
+    }
+    ok_flattened_path_get(flattened_path, count - 1, NULL, &x, &y, NULL, NULL);
+    if (x != end_x || y != end_y) {
+        printf("Failure: Flattened path error (last): %s\n", __func__);
+        ok_flattened_path_free(flattened_path);
+        return 1;
+    }
+    ok_flattened_path_location(flattened_path, 0.0, &x, &y, NULL);
+    if (x != start_x || y != start_y) {
+        printf("Failure: Flattened path error (start): %s\n", __func__);
+        ok_flattened_path_free(flattened_path);
+        return 1;
+    }
+    ok_flattened_path_location(flattened_path, 1.0, &x, &y, NULL);
+    if (x != end_x || y != end_y) {
+        printf("Failure: Flattened path error (end): %s\n", __func__);
+        ok_flattened_path_free(flattened_path);
+        return 1;
+    }
 
     printf("Success: %s\n", __func__);
     ok_flattened_path_free(flattened_path);
