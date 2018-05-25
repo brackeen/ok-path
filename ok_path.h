@@ -212,6 +212,11 @@ bool ok_path_segment_next(const ok_path_t *path, ok_path_iterator_t *iterator,
                           double *out_cx1, double *out_cy1, double *out_cx2, double *out_cy2,
                           double *out_x, double *out_y);
 
+/**
+ * Gets the number of subpaths in a path
+ */
+size_t ok_path_subpath_count(const ok_path_t *path);
+
 // MARK: Path flattening
 
 ok_flattened_path_t *ok_path_flatten(const ok_path_t *path);

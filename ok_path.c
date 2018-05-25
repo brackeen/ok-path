@@ -52,6 +52,9 @@
 #define vector_at(v, i) \
     ((v)->values + (i))
 
+#define vector_push(v, value) \
+    (vector_ensure_capacity(v, 1) ? ((v)->values[((v)->length++)] = (value), 1) : 0)
+
 #define vector_push_new(v) \
     (vector_ensure_capacity(v, 1) ? ((v)->values + ((v)->length++)) : NULL)
 
@@ -106,8 +109,10 @@ struct vector_of_path_flattened_segments vector_of(struct ok_path_flattened_segm
 
 struct ok_path {
     struct vector_of_path_segments segments;
+    struct vector_of(size_t) subpath_indexes;
     double subpath_origin_x;
     double subpath_origin_y;
+    bool active_subpath;
 };
 
 struct ok_flattened_path {
@@ -120,6 +125,7 @@ ok_path_t *ok_path_alloc() {
 
 void ok_path_free(ok_path_t *path) {
     vector_free(&path->segments);
+    vector_free(&path->subpath_indexes);
     free(path);
 }
 
@@ -129,13 +135,16 @@ void ok_flattened_path_free(ok_flattened_path_t *path) {
 }
 
 void ok_path_reset(ok_path_t *path) {
+    path->segments.length = 0;
+    path->subpath_indexes.length = 0;
     path->subpath_origin_x = 0.0;
     path->subpath_origin_y = 0.0;
-    path->segments.length = 0;
+    path->active_subpath = false;
 }
 
 bool ok_path_equals(const ok_path_t *path1, const ok_path_t *path2) {
-    if (path1->segments.length != path2->segments.length) {
+    if (path1->segments.length != path2->segments.length ||
+        path1->subpath_indexes.length != path2->subpath_indexes.length) {
         return false;
     }
     struct ok_path_segment *segment1 = path1->segments.values;
@@ -222,63 +231,73 @@ static double ok_path_last_y(const ok_path_t *path) {
     }
 }
 
+size_t ok_path_subpath_count(const ok_path_t *path) {
+    return path->subpath_indexes.length;
+}
+
 // MARK: Modifying paths
+
+static void _ok_path_add_new_subpath_if_needed(ok_path_t *path) {
+    if (path->segments.length == 0) {
+        ok_path_move_to(path, 0.0, 0.0);
+    }
+    if (!path->active_subpath) {
+        path->active_subpath = true;
+        vector_push(&path->subpath_indexes, path->segments.length - 1);
+    }
+}
 
 void ok_path_move_to(ok_path_t *path, double x, double y) {
     struct ok_path_segment *segment = vector_push_new(&path->segments);
-    if (segment) {
-        segment->type = OK_PATH_MOVE_TO;
-        segment->x = x;
-        segment->y = y;
-        path->subpath_origin_x = x;
-        path->subpath_origin_y = y;
-    }
+    segment->type = OK_PATH_MOVE_TO;
+    segment->x = x;
+    segment->y = y;
+    path->subpath_origin_x = x;
+    path->subpath_origin_y = y;
+    path->active_subpath = false;
 }
 
 void ok_path_line_to(ok_path_t *path, double x, double y) {
+    _ok_path_add_new_subpath_if_needed(path);
     struct ok_path_segment *segment = vector_push_new(&path->segments);
-    if (segment) {
-        segment->type = OK_PATH_LINE_TO;
-        segment->x = x;
-        segment->y = y;
-    }
+    segment->type = OK_PATH_LINE_TO;
+    segment->x = x;
+    segment->y = y;
 }
 
 void ok_path_quad_curve_to(ok_path_t *path, double cx, double cy, double x, double y) {
+    _ok_path_add_new_subpath_if_needed(path);
     struct ok_path_segment *segment = vector_push_new(&path->segments);
-    if (segment) {
-        segment->type = OK_PATH_QUAD_CURVE_TO;
-        segment->x = x;
-        segment->y = y;
-        segment->cx1 = cx;
-        segment->cy1 = cy;
-    }
+    segment->type = OK_PATH_QUAD_CURVE_TO;
+    segment->x = x;
+    segment->y = y;
+    segment->cx1 = cx;
+    segment->cy1 = cy;
 }
 
 void ok_path_curve_to(ok_path_t *path, double cx1, double cy1, double cx2, double cy2,
                       double x, double y) {
+    _ok_path_add_new_subpath_if_needed(path);
     struct ok_path_segment *segment = vector_push_new(&path->segments);
-    if (segment) {
-        segment->type = OK_PATH_CUBIC_CURVE_TO;
-        segment->x = x;
-        segment->y = y;
-        segment->cx1 = cx1;
-        segment->cy1 = cy1;
-        segment->cx2 = cx2;
-        segment->cy2 = cy2;
-    }
+    segment->type = OK_PATH_CUBIC_CURVE_TO;
+    segment->x = x;
+    segment->y = y;
+    segment->cx1 = cx1;
+    segment->cy1 = cy1;
+    segment->cx2 = cx2;
+    segment->cy2 = cy2;
 }
 
 void ok_path_close(ok_path_t *path) {
+    _ok_path_add_new_subpath_if_needed(path);
     struct ok_path_segment *segment = vector_push_new(&path->segments);
-    if (segment) {
-        segment->type = OK_PATH_CLOSE;
-        segment->x = path->subpath_origin_x;
-        segment->y = path->subpath_origin_y;
-    }
+    segment->type = OK_PATH_CLOSE;
+    segment->x = path->subpath_origin_x;
+    segment->y = path->subpath_origin_y;
 }
 
 void ok_path_append(ok_path_t *path, const ok_path_t *path_to_append) {
+    size_t original_count = path->segments.length;
     size_t count = path_to_append->segments.length;
     if (vector_ensure_capacity(&path->segments, count)) {
         struct ok_path_segment *values = path->segments.values;
@@ -288,6 +307,12 @@ void ok_path_append(ok_path_t *path, const ok_path_t *path_to_append) {
         path->segments.length += count;
         path->subpath_origin_x = path_to_append->subpath_origin_x;
         path->subpath_origin_y = path_to_append->subpath_origin_y;
+
+        // Subpaths
+        for (size_t i = 0; i < path_to_append->subpath_indexes.length; i++) {
+            vector_push(&path->subpath_indexes,
+                        original_count + path_to_append->subpath_indexes.values[i]);
+        }
     }
 }
 
@@ -296,6 +321,10 @@ void ok_path_append_lines(ok_path_t *path, const double (*points)[2], size_t num
     if (num_points > 0 && vector_ensure_capacity(path_segments, num_points)) {
         ok_path_move_to(path, (*points)[0], (*points)[1]);
         points++;
+
+        if (num_points > 1) {
+            _ok_path_add_new_subpath_if_needed(path);
+        }
 
         for (size_t i = 1; i < num_points; i++) {
             struct ok_path_segment *segment = vector_at(path_segments, path_segments->length++);
@@ -306,6 +335,8 @@ void ok_path_append_lines(ok_path_t *path, const double (*points)[2], size_t num
         }
     }
 }
+
+// MARK: Arc conversion
 
 void ok_path_arc_to(ok_path_t *path, double radius, bool large_arc, bool sweep,
                     double x, double y) {
