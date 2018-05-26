@@ -163,7 +163,7 @@ static int test_append_lines() {
     return 0;
 }
 
-static int test_flatten() {
+static int test_motion_path() {
     ok_path_t *path = ok_path_alloc();
 
     char *error;
@@ -182,28 +182,28 @@ static int test_flatten() {
         return 1;
     }
 
-    ok_flattened_path_t *flattened_path = ok_path_flatten(path);
+    ok_motion_path_t *motion_path = ok_motion_path_create(path);
     ok_path_free(path);
 
     double x, y;
-    ok_flattened_path_location(flattened_path, 0.0, &x, &y, NULL);
+    ok_motion_path_location(motion_path, 0.0, &x, &y, NULL);
     if (x != start_x || y != start_y) {
         printf("Failure: Flattened path error (start): %s\n", __func__);
-        ok_flattened_path_free(flattened_path);
+        ok_motion_path_free(motion_path);
         return 1;
     }
-    ok_flattened_path_location(flattened_path, 1.0, &x, &y, NULL);
+    ok_motion_path_location(motion_path, 1.0, &x, &y, NULL);
     if (x != end_x || y != end_y) {
         printf("Failure: Flattened path error (end): %s\n", __func__);
-        ok_flattened_path_free(flattened_path);
+        ok_motion_path_free(motion_path);
         return 1;
     }
 
     printf("Success: %s\n", __func__);
-    ok_flattened_path_free(flattened_path);
+    ok_motion_path_free(motion_path);
     return 0;
 }
 
 int main() {
-    return test_svg_parse() || test_iteration() || test_append_lines() || test_flatten();
+    return test_svg_parse() || test_iteration() || test_append_lines() || test_motion_path();
 }

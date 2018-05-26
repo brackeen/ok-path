@@ -45,7 +45,7 @@ typedef struct ok_path ok_path_t;
 
 typedef uintptr_t ok_path_iterator_t;
 
-typedef struct ok_flattened_path ok_flattened_path_t;
+typedef struct ok_motion_path ok_motion_path_t;
 
 // MARK: Creating paths
 
@@ -217,16 +217,24 @@ bool ok_path_segment_next(const ok_path_t *path, ok_path_iterator_t *iterator,
  */
 size_t ok_path_subpath_count(const ok_path_t *path);
 
-// MARK: Path flattening
+// MARK: Motion paths
 
-ok_flattened_path_t *ok_path_flatten(const ok_path_t *path);
+/**
+ * Creates a motion path from an existing path. A motion path can be used to get a location
+ * along the path, get the angle of the path at that location, or to animate a point
+ * along the path at a constant speed.
+ */
+ok_motion_path_t *ok_motion_path_create(const ok_path_t *path);
 
-void ok_flattened_path_free(ok_flattened_path_t *path);
+/**
+ * Frees the path.
+ */
+void ok_motion_path_free(ok_motion_path_t *path);
 
 /**
  * Gets the length of the path.
  */
-double ok_flattened_path_length(const ok_flattened_path_t *path);
+double ok_motion_path_length(const ok_motion_path_t *path);
 
 /**
  * Gets the location on the path at location `p`, where `p` is a value from 0.0 to 1.0.
@@ -237,8 +245,8 @@ double ok_flattened_path_length(const ok_flattened_path_t *path);
  * @param[out] out_y The pointer where the y location should be stored. May be `NULL`.
  * @param[out] out_angle The pointer where the angle, in radians, should be stored. May be `NULL`.
  */
-void ok_flattened_path_location(const ok_flattened_path_t *path, double p,
-                                double *out_x, double *out_y, double *out_angle);
+void ok_motion_path_location(const ok_motion_path_t *path, double p,
+                             double *out_x, double *out_y, double *out_angle);
 
 #ifdef __cplusplus
 }

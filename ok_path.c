@@ -90,22 +90,7 @@ struct ok_path_segment {
     double cx2, cy2;
 };
 
-struct ok_path_flattened_segment {
-    // The type of command this line segment originated from.
-    enum ok_path_segment_type type;
-
-    // Point location.
-    double x, y;
-
-    // Entire length of the path up to this point.
-    double length_to;
-
-    // Angle from previous point to this point.
-    double angle_to;
-};
-
 struct vector_of_path_segments vector_of(struct ok_path_segment);
-struct vector_of_path_flattened_segments vector_of(struct ok_path_flattened_segment);
 
 struct ok_path {
     struct vector_of_path_segments segments;
@@ -115,10 +100,6 @@ struct ok_path {
     bool active_subpath;
 };
 
-struct ok_flattened_path {
-    struct vector_of_path_flattened_segments segments;
-};
-
 ok_path_t *ok_path_alloc() {
     return calloc(1, sizeof(ok_path_t));
 }
@@ -126,11 +107,6 @@ ok_path_t *ok_path_alloc() {
 void ok_path_free(ok_path_t *path) {
     vector_free(&path->segments);
     vector_free(&path->subpath_indexes);
-    free(path);
-}
-
-void ok_flattened_path_free(ok_flattened_path_t *path) {
-    vector_free(&path->segments);
     free(path);
 }
 
@@ -790,7 +766,32 @@ static size_t _ok_num_segments(double x0, double y0, double x1, double y1,
     return num_segments;
 }
 
-static void _ok_flattened_path_add_segment(ok_flattened_path_t *path,
+// MARK: Motion Paths
+
+struct ok_motion_path_segment {
+    // The type of command this line segment originated from.
+    enum ok_path_segment_type type;
+
+    // Point location.
+    double x, y;
+
+    // Entire length of the path up to this point.
+    double length_to;
+
+    // Angle from previous point to this point.
+    double angle_to;
+};
+
+struct ok_motion_path {
+    struct vector_of(struct ok_motion_path_segment) segments;
+};
+
+void ok_motion_path_free(ok_motion_path_t *path) {
+    vector_free(&path->segments);
+    free(path);
+}
+
+static void _ok_flattened_path_add_segment(ok_motion_path_t *path,
                                            enum ok_path_segment_type type, double x, double y) {
     double dx;
     double dy;
@@ -800,13 +801,13 @@ static void _ok_flattened_path_add_segment(ok_flattened_path_t *path,
         dy = y;
         prev_length = 0.0;
     } else {
-        struct ok_path_flattened_segment *segment = vector_last(&path->segments);
+        struct ok_motion_path_segment *segment = vector_last(&path->segments);
         dx = x - segment->x;
         dy = y - segment->y;
         prev_length = segment->length_to;
     }
 
-    struct ok_path_flattened_segment *segment = vector_push_new(&path->segments);
+    struct ok_motion_path_segment *segment = vector_push_new(&path->segments);
     if (segment) {
         segment->type = type;
         segment->x = x;
@@ -820,7 +821,7 @@ static void _ok_flattened_path_add_segment(ok_flattened_path_t *path,
     }
 }
 
-static void _ok_flattened_path_add_curve_division(ok_flattened_path_t *path,
+static void _ok_flattened_path_add_curve_division(ok_motion_path_t *path,
                                                   enum ok_path_segment_type type,
                                                   size_t num_segments,
                                                   double x0, double y0, double x1, double y1,
@@ -862,7 +863,7 @@ static void _ok_flattened_path_add_curve_division(ok_flattened_path_t *path,
     _ok_flattened_path_add_segment(path, type, x3, y3);
 }
 
-static size_t _ok_flattened_path_add_curve(ok_flattened_path_t *path,
+static size_t _ok_flattened_path_add_curve(ok_motion_path_t *path,
                                            enum ok_path_segment_type type,
                                            double x1, double y1, double x2, double y2,
                                            double x3, double y3, double x4, double y4) {
@@ -928,7 +929,7 @@ static size_t _ok_flattened_path_add_curve(ok_flattened_path_t *path,
     return num_segments1 + num_segments2 + num_segments3 + num_segments4;
 }
 
-static size_t _ok_path_flatten_to(const ok_path_t *path, ok_flattened_path_t *out_path) {
+static size_t _ok_path_flatten_to(const ok_path_t *path, ok_motion_path_t *out_path) {
     double x = 0.0;
     double y = 0.0;
     size_t count = 0;
@@ -958,11 +959,11 @@ static size_t _ok_path_flatten_to(const ok_path_t *path, ok_flattened_path_t *ou
     return count;
 }
 
-ok_flattened_path_t *ok_path_flatten(const ok_path_t *path) {
+ok_motion_path_t *ok_motion_path_create(const ok_path_t *path) {
     size_t count = _ok_path_flatten_to(path, NULL);
-    ok_flattened_path_t *out_path = calloc(1, sizeof(ok_flattened_path_t));
+    ok_motion_path_t *out_path = calloc(1, sizeof(ok_motion_path_t));
     if (!vector_ensure_capacity(&out_path->segments, count)) {
-        free(out_path);
+        ok_motion_path_free(out_path);
         return NULL;
     } else {
         _ok_path_flatten_to(path, out_path);
@@ -970,9 +971,7 @@ ok_flattened_path_t *ok_path_flatten(const ok_path_t *path) {
     }
 }
 
-// MARK: Flattened path querying
-
-double ok_flattened_path_length(const ok_flattened_path_t *path) {
+double ok_motion_path_length(const ok_motion_path_t *path) {
     if (path->segments.length > 0) {
         return vector_last(&path->segments)->length_to;
     } else {
@@ -1004,8 +1003,8 @@ static double _ok_shortest_arc(double from_radians, double to_radians) {
     }
 }
 
-void ok_flattened_path_location(const ok_flattened_path_t *path, double p,
-                                double *out_x, double *out_y, double *out_angle) {
+void ok_motion_path_location(const ok_motion_path_t *path, double p,
+                             double *out_x, double *out_y, double *out_angle) {
     const size_t count = path->segments.length;
     if (count == 0) {
         if (out_x) {
@@ -1018,8 +1017,8 @@ void ok_flattened_path_location(const ok_flattened_path_t *path, double p,
             *out_angle = 0.0;
         }
     } else {
-        struct ok_path_flattened_segment *flattened_segments = path->segments.values;
-        const double length = flattened_segments[count - 1].length_to;
+        struct ok_motion_path_segment *segments = path->segments.values;
+        const double length = segments[count - 1].length_to;
         size_t p_low;
         size_t p_high;
         if (p <= 0.0) {
@@ -1035,7 +1034,7 @@ void ok_flattened_path_location(const ok_flattened_path_t *path, double p,
             p_high = count - 1;
             while (p_high - p_low > 1) {
                 size_t index = (p_high + p_low) / 2;
-                if (flattened_segments[index].length_to > l) {
+                if (segments[index].length_to > l) {
                     p_high = index;
                 } else {
                     p_low = index;
@@ -1043,8 +1042,8 @@ void ok_flattened_path_location(const ok_flattened_path_t *path, double p,
             }
         }
 
-        struct ok_path_flattened_segment *s1 = &flattened_segments[p_low];
-        struct ok_path_flattened_segment *s2 = &flattened_segments[p_high];
+        struct ok_motion_path_segment *s1 = &segments[p_low];
+        struct ok_motion_path_segment *s2 = &segments[p_high];
         if (p_low == p_high || length == 0.0) {
             if (out_x) {
                 *out_x = s1->x;
