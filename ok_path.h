@@ -53,7 +53,7 @@ typedef struct ok_motion_path ok_motion_path_t;
  * Creates a new #ok_path_t.
  * The path should be freed with #ok_path_free(ok_path_t *).
  */
-ok_path_t *ok_path_alloc(void);
+ok_path_t *ok_path_create(void);
 
 /**
  * Frees an #ok_path_t.

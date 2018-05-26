@@ -5,8 +5,8 @@
 #include <string.h>
 
 static int test_svg_parse() {
-    ok_path_t *path1 = ok_path_alloc();
-    ok_path_t *path2 = ok_path_alloc();
+    ok_path_t *path1 = ok_path_create();
+    ok_path_t *path2 = ok_path_create();
 
     // Test if two empty paths are equal
     if (!ok_path_equals(path1, path2)) {
@@ -66,8 +66,8 @@ static int test_svg_parse() {
 }
 
 static int test_iteration() {
-    ok_path_t *path1 = ok_path_alloc();
-    ok_path_t *path2 = ok_path_alloc();
+    ok_path_t *path1 = ok_path_create();
+    ok_path_t *path2 = ok_path_create();
 
     ok_path_move_to(path2, 100, 100);
     ok_path_line_to(path2, 100, 200);
@@ -124,7 +124,7 @@ static int test_iteration() {
 }
 
 static int test_append_lines() {
-    ok_path_t *path1 = ok_path_alloc();
+    ok_path_t *path1 = ok_path_create();
     ok_path_t *path2;
 
     char *error;
@@ -137,7 +137,7 @@ static int test_append_lines() {
 
     // Using 2D array
     double points[][2] = {{0, 0}, {10, 20}, {40, 20}, {30, 10}, {50, 0}, {0, 0}};
-    path2 = ok_path_alloc();
+    path2 = ok_path_create();
     ok_path_append_lines(path2, points, sizeof(points) / sizeof(*points));
     if (!ok_path_equals(path1, path2)) {
         printf("Failure: %s: Paths not equal\n", __func__);
@@ -164,7 +164,7 @@ static int test_append_lines() {
 }
 
 static int test_motion_path() {
-    ok_path_t *path = ok_path_alloc();
+    ok_path_t *path = ok_path_create();
 
     char *error;
 

@@ -100,7 +100,7 @@ struct ok_path {
     bool active_subpath;
 };
 
-ok_path_t *ok_path_alloc() {
+ok_path_t *ok_path_create() {
     return calloc(1, sizeof(ok_path_t));
 }
 
