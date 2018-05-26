@@ -86,11 +86,11 @@ static int test_iteration() {
     ok_path_close(path2);
 
     ok_path_iterator_t iterator = 0;
-    enum ok_path_segment_type type;
+    enum ok_path_element_type type;
     double cx1, cy1;
     double cx2, cy2;
     double x, y;
-    while (ok_path_segment_next(path2, &iterator, &type, &cx1, &cy1, &cx2, &cy2, &x, &y)) {
+    while (ok_path_element_next(path2, &iterator, &type, &cx1, &cy1, &cx2, &cy2, &x, &y)) {
         switch (type) {
             case OK_PATH_MOVE_TO:
                 ok_path_move_to(path1, x, y);

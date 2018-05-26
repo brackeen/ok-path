@@ -30,7 +30,7 @@
 extern "C" {
 #endif
 
-enum ok_path_segment_type {
+enum ok_path_element_type {
     OK_PATH_MOVE_TO = 0,
     OK_PATH_LINE_TO,
     OK_PATH_QUAD_CURVE_TO,
@@ -175,7 +175,7 @@ bool ok_path_append_svg(ok_path_t *path, const char *svg_path, char **out_error_
 void ok_path_close(ok_path_t *path);
 
 /**
- * Remove all segments from the path.
+ * Remove all elements from the path.
  */
 void ok_path_reset(ok_path_t *path);
 
@@ -184,31 +184,31 @@ void ok_path_reset(ok_path_t *path);
 /**
  * Checks if two paths are equal.
  *
- * @return `true` if both paths contain the same sequence of path segments.
+ * @return `true` if both paths contain the same sequence of path elements.
  */
 bool ok_path_equals(const ok_path_t *path1, const ok_path_t *path2);
 
 /**
- * Gets a sepecific segments in the path.
+ * Gets a sepecific elements in the path.
  *
  * @param path The path.
  * @param iterator The iterator. Set to 0 to start at the beginning
- * @param[out] out_type The segment type.
+ * @param[out] out_type The element type.
  * @param[out] out_cx1 The x location of the first control point. This value is only set if the
- *     segment type is #OK_PATH_QUAD_CURVE_TO or #OK_PATH_CUBIC_CURVE_TO.
+ *     element type is #OK_PATH_QUAD_CURVE_TO or #OK_PATH_CUBIC_CURVE_TO.
  * @param[out] out_cy1 The y location of the first control point. This value is only set if the
- *     segment type is #OK_PATH_QUAD_CURVE_TO or #OK_PATH_CUBIC_CURVE_TO.
+ *     element type is #OK_PATH_QUAD_CURVE_TO or #OK_PATH_CUBIC_CURVE_TO.
  * @param[out] out_cx2 The x location of the second control point. This value is only set if the
- *     segment type is #OK_PATH_CUBIC_CURVE_TO.
+ *     element type is #OK_PATH_CUBIC_CURVE_TO.
  * @param[out] out_cy2 The y location of the second control point. This value is only set if the
- *     segment type is #OK_PATH_CUBIC_CURVE_TO.
- * @param[out] out_x The x location of the segment's end point.
- * @param[out] out_y The y location of the segment's end point.
- * @return `true` if the next segment is returned, `false` if there are no remaining semennts in
+ *     element type is #OK_PATH_CUBIC_CURVE_TO.
+ * @param[out] out_x The x location of the element's end point.
+ * @param[out] out_y The y location of the element end point.
+ * @return `true` if the next element is returned, `false` if there are no remaining elements in
  * the parh.
  */
-bool ok_path_segment_next(const ok_path_t *path, ok_path_iterator_t *iterator,
-                          enum ok_path_segment_type *out_type,
+bool ok_path_element_next(const ok_path_t *path, ok_path_iterator_t *iterator,
+                          enum ok_path_element_type *out_type,
                           double *out_cx1, double *out_cy1, double *out_cx2, double *out_cy2,
                           double *out_x, double *out_y);
 

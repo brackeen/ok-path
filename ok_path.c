@@ -81,8 +81,8 @@ static bool vector_realloc(void **values, size_t min_capacity, size_t element_si
 #define ok_path_type_is_curve(type) ((type) == OK_PATH_QUAD_CURVE_TO || \
                                      (type) == OK_PATH_CUBIC_CURVE_TO)
 
-struct ok_path_segment {
-    enum ok_path_segment_type type;
+struct ok_path_element {
+    enum ok_path_element_type type;
     double x, y;
 
     // Control points. Valid if type is CURVE_TO, otherwise these are undefined.
@@ -90,10 +90,10 @@ struct ok_path_segment {
     double cx2, cy2;
 };
 
-struct vector_of_path_segments vector_of(struct ok_path_segment);
+struct vector_of_path_elements vector_of(struct ok_path_element);
 
 struct ok_path {
-    struct vector_of_path_segments segments;
+    struct vector_of_path_elements elements;
     struct vector_of(size_t) subpath_indexes;
     double subpath_origin_x;
     double subpath_origin_y;
@@ -105,13 +105,13 @@ ok_path_t *ok_path_alloc() {
 }
 
 void ok_path_free(ok_path_t *path) {
-    vector_free(&path->segments);
+    vector_free(&path->elements);
     vector_free(&path->subpath_indexes);
     free(path);
 }
 
 void ok_path_reset(ok_path_t *path) {
-    path->segments.length = 0;
+    path->elements.length = 0;
     path->subpath_indexes.length = 0;
     path->subpath_origin_x = 0.0;
     path->subpath_origin_y = 0.0;
@@ -119,15 +119,15 @@ void ok_path_reset(ok_path_t *path) {
 }
 
 bool ok_path_equals(const ok_path_t *path1, const ok_path_t *path2) {
-    if (path1->segments.length != path2->segments.length ||
+    if (path1->elements.length != path2->elements.length ||
         path1->subpath_indexes.length != path2->subpath_indexes.length) {
         return false;
     }
-    struct ok_path_segment *segment1 = path1->segments.values;
-    struct ok_path_segment *segment2 = path2->segments.values;
-    for (size_t i = 0; i < path1->segments.length; i++) {
-        enum ok_path_segment_type type1 = segment1->type;
-        enum ok_path_segment_type type2 = segment2->type;
+    struct ok_path_element *element1 = path1->elements.values;
+    struct ok_path_element *element2 = path2->elements.values;
+    for (size_t i = 0; i < path1->elements.length; i++) {
+        enum ok_path_element_type type1 = element1->type;
+        enum ok_path_element_type type2 = element2->type;
         if (type1 == OK_PATH_CLOSE) {
             type1 = OK_PATH_LINE_TO;
         }
@@ -143,48 +143,48 @@ bool ok_path_equals(const ok_path_t *path1, const ok_path_t *path2) {
             case OK_PATH_LINE_TO:
             case OK_PATH_MOVE_TO:
             case OK_PATH_CLOSE:
-                if (segment1->x != segment2->x || segment1->y != segment2->y) {
+                if (element1->x != element2->x || element1->y != element2->y) {
                     return false;
                 }
                 break;
             case OK_PATH_QUAD_CURVE_TO:
-                if (segment1->cx1 != segment2->cx1 || segment1->cy1 != segment2->cy1) {
+                if (element1->cx1 != element2->cx1 || element1->cy1 != element2->cy1) {
                     return false;
                 }
                 break;
             case OK_PATH_CUBIC_CURVE_TO:
-                if (segment1->cx1 != segment2->cx1 || segment1->cy1 != segment2->cy1 ||
-                    segment1->cx2 != segment2->cx2 || segment1->cy2 != segment2->cy2) {
+                if (element1->cx1 != element2->cx1 || element1->cy1 != element2->cy1 ||
+                    element1->cx2 != element2->cx2 || element1->cy2 != element2->cy2) {
                     return false;
                 }
                 break;
         }
 
-        segment1++;
-        segment2++;
+        element1++;
+        element2++;
     }
     return true;
 }
 
-bool ok_path_segment_next(const ok_path_t *path, ok_path_iterator_t *iterator,
-                          enum ok_path_segment_type *out_type,
+bool ok_path_element_next(const ok_path_t *path, ok_path_iterator_t *iterator,
+                          enum ok_path_element_type *out_type,
                           double *out_cx1, double *out_cy1, double *out_cx2, double *out_cy2,
                           double *out_x, double *out_y) {
-    if (*iterator >= path->segments.length) {
+    if (*iterator >= path->elements.length) {
         return false;
     } else {
-        struct ok_path_segment *segment = path->segments.values + *iterator;
-        *out_type = segment->type;
-        *out_x = segment->x;
-        *out_y = segment->y;
-        if (segment->type == OK_PATH_QUAD_CURVE_TO) {
-            *out_cx1 = segment->cx1;
-            *out_cy1 = segment->cy1;
-        } else if (segment->type == OK_PATH_CUBIC_CURVE_TO) {
-            *out_cx1 = segment->cx1;
-            *out_cy1 = segment->cy1;
-            *out_cx2 = segment->cx2;
-            *out_cy2 = segment->cy2;
+        struct ok_path_element *element = path->elements.values + *iterator;
+        *out_type = element->type;
+        *out_x = element->x;
+        *out_y = element->y;
+        if (element->type == OK_PATH_QUAD_CURVE_TO) {
+            *out_cx1 = element->cx1;
+            *out_cy1 = element->cy1;
+        } else if (element->type == OK_PATH_CUBIC_CURVE_TO) {
+            *out_cx1 = element->cx1;
+            *out_cy1 = element->cy1;
+            *out_cx2 = element->cx2;
+            *out_cy2 = element->cy2;
         }
         ++*iterator;
         return true;
@@ -192,16 +192,16 @@ bool ok_path_segment_next(const ok_path_t *path, ok_path_iterator_t *iterator,
 }
 
 static double ok_path_last_x(const ok_path_t *path) {
-    if (path->segments.length) {
-        return vector_last(&path->segments)->x;
+    if (path->elements.length) {
+        return vector_last(&path->elements)->x;
     } else {
         return 0;
     }
 }
 
 static double ok_path_last_y(const ok_path_t *path) {
-    if (path->segments.length) {
-        return vector_last(&path->segments)->y;
+    if (path->elements.length) {
+        return vector_last(&path->elements)->y;
     } else {
         return 0;
     }
@@ -214,20 +214,20 @@ size_t ok_path_subpath_count(const ok_path_t *path) {
 // MARK: Modifying paths
 
 static void _ok_path_add_new_subpath_if_needed(ok_path_t *path) {
-    if (path->segments.length == 0) {
+    if (path->elements.length == 0) {
         ok_path_move_to(path, 0.0, 0.0);
     }
     if (!path->active_subpath) {
         path->active_subpath = true;
-        vector_push(&path->subpath_indexes, path->segments.length - 1);
+        vector_push(&path->subpath_indexes, path->elements.length - 1);
     }
 }
 
 void ok_path_move_to(ok_path_t *path, double x, double y) {
-    struct ok_path_segment *segment = vector_push_new(&path->segments);
-    segment->type = OK_PATH_MOVE_TO;
-    segment->x = x;
-    segment->y = y;
+    struct ok_path_element *element = vector_push_new(&path->elements);
+    element->type = OK_PATH_MOVE_TO;
+    element->x = x;
+    element->y = y;
     path->subpath_origin_x = x;
     path->subpath_origin_y = y;
     path->active_subpath = false;
@@ -235,52 +235,52 @@ void ok_path_move_to(ok_path_t *path, double x, double y) {
 
 void ok_path_line_to(ok_path_t *path, double x, double y) {
     _ok_path_add_new_subpath_if_needed(path);
-    struct ok_path_segment *segment = vector_push_new(&path->segments);
-    segment->type = OK_PATH_LINE_TO;
-    segment->x = x;
-    segment->y = y;
+    struct ok_path_element *element = vector_push_new(&path->elements);
+    element->type = OK_PATH_LINE_TO;
+    element->x = x;
+    element->y = y;
 }
 
 void ok_path_quad_curve_to(ok_path_t *path, double cx, double cy, double x, double y) {
     _ok_path_add_new_subpath_if_needed(path);
-    struct ok_path_segment *segment = vector_push_new(&path->segments);
-    segment->type = OK_PATH_QUAD_CURVE_TO;
-    segment->x = x;
-    segment->y = y;
-    segment->cx1 = cx;
-    segment->cy1 = cy;
+    struct ok_path_element *element = vector_push_new(&path->elements);
+    element->type = OK_PATH_QUAD_CURVE_TO;
+    element->x = x;
+    element->y = y;
+    element->cx1 = cx;
+    element->cy1 = cy;
 }
 
 void ok_path_curve_to(ok_path_t *path, double cx1, double cy1, double cx2, double cy2,
                       double x, double y) {
     _ok_path_add_new_subpath_if_needed(path);
-    struct ok_path_segment *segment = vector_push_new(&path->segments);
-    segment->type = OK_PATH_CUBIC_CURVE_TO;
-    segment->x = x;
-    segment->y = y;
-    segment->cx1 = cx1;
-    segment->cy1 = cy1;
-    segment->cx2 = cx2;
-    segment->cy2 = cy2;
+    struct ok_path_element *element = vector_push_new(&path->elements);
+    element->type = OK_PATH_CUBIC_CURVE_TO;
+    element->x = x;
+    element->y = y;
+    element->cx1 = cx1;
+    element->cy1 = cy1;
+    element->cx2 = cx2;
+    element->cy2 = cy2;
 }
 
 void ok_path_close(ok_path_t *path) {
     _ok_path_add_new_subpath_if_needed(path);
-    struct ok_path_segment *segment = vector_push_new(&path->segments);
-    segment->type = OK_PATH_CLOSE;
-    segment->x = path->subpath_origin_x;
-    segment->y = path->subpath_origin_y;
+    struct ok_path_element *element = vector_push_new(&path->elements);
+    element->type = OK_PATH_CLOSE;
+    element->x = path->subpath_origin_x;
+    element->y = path->subpath_origin_y;
 }
 
 void ok_path_append(ok_path_t *path, const ok_path_t *path_to_append) {
-    size_t original_count = path->segments.length;
-    size_t count = path_to_append->segments.length;
-    if (vector_ensure_capacity(&path->segments, count)) {
-        struct ok_path_segment *values = path->segments.values;
-        struct ok_path_segment *src_values = path_to_append->segments.values;
-        struct ok_path_segment *dst_values = &values[path->segments.length];
-        memcpy(dst_values, src_values, count * sizeof(struct ok_path_segment));
-        path->segments.length += count;
+    size_t original_count = path->elements.length;
+    size_t count = path_to_append->elements.length;
+    if (vector_ensure_capacity(&path->elements, count)) {
+        struct ok_path_element *values = path->elements.values;
+        struct ok_path_element *src_values = path_to_append->elements.values;
+        struct ok_path_element *dst_values = &values[path->elements.length];
+        memcpy(dst_values, src_values, count * sizeof(struct ok_path_element));
+        path->elements.length += count;
         path->subpath_origin_x = path_to_append->subpath_origin_x;
         path->subpath_origin_y = path_to_append->subpath_origin_y;
 
@@ -293,8 +293,8 @@ void ok_path_append(ok_path_t *path, const ok_path_t *path_to_append) {
 }
 
 void ok_path_append_lines(ok_path_t *path, const double (*points)[2], size_t num_points) {
-    struct vector_of_path_segments *path_segments = &path->segments;
-    if (num_points > 0 && vector_ensure_capacity(path_segments, num_points)) {
+    struct vector_of_path_elements *path_elements = &path->elements;
+    if (num_points > 0 && vector_ensure_capacity(path_elements, num_points)) {
         ok_path_move_to(path, (*points)[0], (*points)[1]);
         points++;
 
@@ -303,10 +303,10 @@ void ok_path_append_lines(ok_path_t *path, const double (*points)[2], size_t num
         }
 
         for (size_t i = 1; i < num_points; i++) {
-            struct ok_path_segment *segment = vector_at(path_segments, path_segments->length++);
-            segment->type = OK_PATH_LINE_TO;
-            segment->x = (*points)[0];
-            segment->y = (*points)[1];
+            struct ok_path_element *element = vector_at(path_elements, path_elements->length++);
+            element->type = OK_PATH_LINE_TO;
+            element->x = (*points)[0];
+            element->y = (*points)[1];
             points++;
         }
     }
@@ -770,7 +770,7 @@ static size_t _ok_num_segments(double x0, double y0, double x1, double y1,
 
 struct ok_motion_path_segment {
     // The type of command this line segment originated from.
-    enum ok_path_segment_type type;
+    enum ok_path_element_type type;
 
     // Point location.
     double x, y;
@@ -792,7 +792,7 @@ void ok_motion_path_free(ok_motion_path_t *path) {
 }
 
 static void _ok_flattened_path_add_segment(ok_motion_path_t *path,
-                                           enum ok_path_segment_type type, double x, double y) {
+                                           enum ok_path_element_type type, double x, double y) {
     double dx;
     double dy;
     double prev_length;
@@ -822,7 +822,7 @@ static void _ok_flattened_path_add_segment(ok_motion_path_t *path,
 }
 
 static void _ok_flattened_path_add_curve_division(ok_motion_path_t *path,
-                                                  enum ok_path_segment_type type,
+                                                  enum ok_path_element_type type,
                                                   size_t num_segments,
                                                   double x0, double y0, double x1, double y1,
                                                   double x2, double y2, double x3, double y3) {
@@ -864,7 +864,7 @@ static void _ok_flattened_path_add_curve_division(ok_motion_path_t *path,
 }
 
 static size_t _ok_flattened_path_add_curve(ok_motion_path_t *path,
-                                           enum ok_path_segment_type type,
+                                           enum ok_path_element_type type,
                                            double x1, double y1, double x2, double y2,
                                            double x3, double y3, double x4, double y4) {
     // First division
@@ -933,28 +933,28 @@ static size_t _ok_path_flatten_to(const ok_path_t *path, ok_motion_path_t *out_p
     double x = 0.0;
     double y = 0.0;
     size_t count = 0;
-    for (size_t i = 0; i < path->segments.length; i++) {
-        struct ok_path_segment *segment = &path->segments.values[i];
-        if (segment->type == OK_PATH_QUAD_CURVE_TO) {
-            double cx1 = (x + segment->cx1 * 2.0) / 3.0;
-            double cy1 = (y + segment->cy1 * 2.0) / 3.0;
-            double cx2 = (segment->x + segment->cx1 * 2.0) / 3.0;
-            double cy2 = (segment->y + segment->cy1 * 2.0) / 3.0;
+    for (size_t i = 0; i < path->elements.length; i++) {
+        struct ok_path_element *element = &path->elements.values[i];
+        if (element->type == OK_PATH_QUAD_CURVE_TO) {
+            double cx1 = (x + element->cx1 * 2.0) / 3.0;
+            double cy1 = (y + element->cy1 * 2.0) / 3.0;
+            double cx2 = (element->x + element->cx1 * 2.0) / 3.0;
+            double cy2 = (element->y + element->cy1 * 2.0) / 3.0;
             count += _ok_flattened_path_add_curve(out_path, OK_PATH_QUAD_CURVE_TO, x, y,
-                                                  cx1, cy1, cx2, cy2, segment->x, segment->y);
-        } else if (segment->type == OK_PATH_CUBIC_CURVE_TO) {
+                                                  cx1, cy1, cx2, cy2, element->x, element->y);
+        } else if (element->type == OK_PATH_CUBIC_CURVE_TO) {
             count += _ok_flattened_path_add_curve(out_path, OK_PATH_CUBIC_CURVE_TO, x, y,
-                                                  segment->cx1, segment->cy1,
-                                                  segment->cx2, segment->cy2,
-                                                  segment->x, segment->y);
+                                                  element->cx1, element->cy1,
+                                                  element->cx2, element->cy2,
+                                                  element->x, element->y);
         } else {
             if (out_path) {
-                _ok_flattened_path_add_segment(out_path, segment->type, segment->x, segment->y);
+                _ok_flattened_path_add_segment(out_path, element->type, element->x, element->y);
             }
             count++;
         }
-        x = segment->x;
-        y = segment->y;
+        x = element->x;
+        y = element->y;
     }
     return count;
 }
