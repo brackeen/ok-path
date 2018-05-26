@@ -224,26 +224,6 @@ ok_flattened_path_t *ok_path_flatten(const ok_path_t *path);
 void ok_flattened_path_free(ok_flattened_path_t *path);
 
 /**
- * Gets the number of points in the flattened path
- */
-size_t ok_flattened_path_count(ok_flattened_path_t *path);
-
-/**
- * Gets a point in the flattened path.
- *
- * @param path The path.
- * @param index The index of the point, from `0` to `count-1`.
- * @param[out] out_type The original segment type (before flattening). May be `NULL`.
- * @param[out] out_x The x location of the point. May be `NULL`.
- * @param[out] out_y The y location of the point. May be `NULL`.
- * @param[out] out_length_to The entire length of the path up to this point. May be `NULL`.
- * @param[out] out_angle_to The angle from the previous point to this point. May be `NULL`.
- */
-void ok_flattened_path_get(ok_flattened_path_t *path, size_t index,
-                           enum ok_path_segment_type *out_type, double *out_x, double *out_y,
-                           double *out_length_to, double *out_angle_to);
-
-/**
  * Gets the length of the path.
  */
 double ok_flattened_path_length(const ok_flattened_path_t *path);

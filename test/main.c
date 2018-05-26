@@ -186,19 +186,6 @@ static int test_flatten() {
     ok_path_free(path);
 
     double x, y;
-    size_t count = ok_flattened_path_count(flattened_path);
-    ok_flattened_path_get(flattened_path, 0, NULL, &x, &y, NULL, NULL);
-    if (x != start_x || y != start_y) {
-        printf("Failure: Flattened path error (first): %s\n", __func__);
-        ok_flattened_path_free(flattened_path);
-        return 1;
-    }
-    ok_flattened_path_get(flattened_path, count - 1, NULL, &x, &y, NULL, NULL);
-    if (x != end_x || y != end_y) {
-        printf("Failure: Flattened path error (last): %s\n", __func__);
-        ok_flattened_path_free(flattened_path);
-        return 1;
-    }
     ok_flattened_path_location(flattened_path, 0.0, &x, &y, NULL);
     if (x != start_x || y != start_y) {
         printf("Failure: Flattened path error (start): %s\n", __func__);
