@@ -85,13 +85,11 @@ static int test_iteration() {
     ok_path_curve_to(path2, 250, 300, 400, 300, 400, 200);
     ok_path_close(path2);
 
-    ok_path_iterator_t iterator = 0;
-    enum ok_path_element_type type;
-    double cx1, cy1;
-    double cx2, cy2;
-    double x, y;
-    while (ok_path_element_next(path2, &iterator, &type, &cx1, &cy1, &cx2, &cy2, &x, &y)) {
-        switch (type) {
+    for (size_t i = 0; i < ok_path_element_count(path2); i++) {
+        double cx1, cy1;
+        double cx2, cy2;
+        double x, y;
+        switch (ok_path_element_get(path2, i, &cx1, &cy1, &cx2, &cy2, &x, &y)) {
             case OK_PATH_MOVE_TO:
                 ok_path_move_to(path1, x, y);
                 break;

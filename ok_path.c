@@ -166,29 +166,27 @@ bool ok_path_equals(const ok_path_t *path1, const ok_path_t *path2) {
     return true;
 }
 
-bool ok_path_element_next(const ok_path_t *path, ok_path_iterator_t *iterator,
-                          enum ok_path_element_type *out_type,
-                          double *out_cx1, double *out_cy1, double *out_cx2, double *out_cy2,
-                          double *out_x, double *out_y) {
-    if (*iterator >= path->elements.length) {
-        return false;
-    } else {
-        struct ok_path_element *element = path->elements.values + *iterator;
-        *out_type = element->type;
-        *out_x = element->x;
-        *out_y = element->y;
-        if (element->type == OK_PATH_QUAD_CURVE_TO) {
-            *out_cx1 = element->cx1;
-            *out_cy1 = element->cy1;
-        } else if (element->type == OK_PATH_CUBIC_CURVE_TO) {
-            *out_cx1 = element->cx1;
-            *out_cy1 = element->cy1;
-            *out_cx2 = element->cx2;
-            *out_cy2 = element->cy2;
-        }
-        ++*iterator;
-        return true;
+size_t ok_path_element_count(const ok_path_t *path) {
+    return path->elements.length;
+}
+
+enum ok_path_element_type ok_path_element_get(const ok_path_t *path, size_t index,
+                                              double *out_cx1, double *out_cy1,
+                                              double *out_cx2, double *out_cy2,
+                                              double *out_x, double *out_y) {
+    struct ok_path_element *element = path->elements.values + index;
+    *out_x = element->x;
+    *out_y = element->y;
+    if (element->type == OK_PATH_QUAD_CURVE_TO) {
+        *out_cx1 = element->cx1;
+        *out_cy1 = element->cy1;
+    } else if (element->type == OK_PATH_CUBIC_CURVE_TO) {
+        *out_cx1 = element->cx1;
+        *out_cy1 = element->cy1;
+        *out_cx2 = element->cx2;
+        *out_cy2 = element->cy2;
     }
+    return element->type;
 }
 
 static double ok_path_last_x(const ok_path_t *path) {

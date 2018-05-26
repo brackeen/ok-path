@@ -43,8 +43,6 @@ enum ok_path_element_type {
  */
 typedef struct ok_path ok_path_t;
 
-typedef uintptr_t ok_path_iterator_t;
-
 typedef struct ok_motion_path ok_motion_path_t;
 
 // MARK: Creating paths
@@ -189,11 +187,16 @@ void ok_path_reset(ok_path_t *path);
 bool ok_path_equals(const ok_path_t *path1, const ok_path_t *path2);
 
 /**
- * Gets a sepecific elements in the path.
+ * Gets the number of elements in the path.
+ */
+size_t ok_path_element_count(const ok_path_t *path);
+
+/**
+ * Gets an element in the path.
  *
  * @param path The path.
- * @param iterator The iterator. Set to 0 to start at the beginning
- * @param[out] out_type The element type.
+ * @param index The element index, from `0` to `count-1`, where `count` is the value returned from
+ *     #ok_path_element_count.
  * @param[out] out_cx1 The x location of the first control point. This value is only set if the
  *     element type is #OK_PATH_QUAD_CURVE_TO or #OK_PATH_CUBIC_CURVE_TO.
  * @param[out] out_cy1 The y location of the first control point. This value is only set if the
@@ -203,14 +206,13 @@ bool ok_path_equals(const ok_path_t *path1, const ok_path_t *path2);
  * @param[out] out_cy2 The y location of the second control point. This value is only set if the
  *     element type is #OK_PATH_CUBIC_CURVE_TO.
  * @param[out] out_x The x location of the element's end point.
- * @param[out] out_y The y location of the element end point.
- * @return `true` if the next element is returned, `false` if there are no remaining elements in
- * the parh.
+ * @param[out] out_y The y location of the element's end point.
+ * @return the element type.
  */
-bool ok_path_element_next(const ok_path_t *path, ok_path_iterator_t *iterator,
-                          enum ok_path_element_type *out_type,
-                          double *out_cx1, double *out_cy1, double *out_cx2, double *out_cy2,
-                          double *out_x, double *out_y);
+enum ok_path_element_type ok_path_element_get(const ok_path_t *path, size_t index,
+                                              double *out_cx1, double *out_cy1,
+                                              double *out_cx2, double *out_cy2,
+                                              double *out_x, double *out_y);
 
 /**
  * Gets the number of subpaths in a path
