@@ -214,17 +214,28 @@ enum ok_path_element_type ok_path_element_get(const ok_path_t *path, size_t inde
                                               double *out_cx2, double *out_cy2,
                                               double *out_x, double *out_y);
 
+// MARK: Subpaths
+
 /**
- * Gets the number of subpaths in a path
+ * Gets the number of subpaths in a path.
  */
-size_t ok_path_subpath_count(const ok_path_t *path);
+size_t ok_subpath_count(const ok_path_t *path);
+
+/**
+ * Creates a copy of a subpath from the path.
+ *
+ * @param path The path.
+ * @param index The subpath index, from `0` to `count-1`, where `count` is the value returned from
+ *     #ok_subpath_count.
+ */
+ok_path_t *ok_subpath_create(const ok_path_t *path, size_t index);
 
 // MARK: Motion paths
 
 /**
  * Creates a motion path from an existing path. A motion path can be used to get a location
  * along the path, get the angle of the path at that location, or to animate a point
- * along the path at a constant speed.
+ * along the path at a constant rate.
  */
 ok_motion_path_t *ok_motion_path_create(const ok_path_t *path);
 

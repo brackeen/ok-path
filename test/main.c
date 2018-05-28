@@ -161,6 +161,41 @@ static int test_append_lines() {
     return 0;
 }
 
+static int test_subpath() {
+    const char *svg_path = "M 100,100 L100,200 h-100 v-100-100 L0.25e-4,0.25E+2"
+        "M 0 0 a25,25 -30 0,1 50,-25 M 200,300 Q400,50 600,300 T1000,300 M 100,200 "
+        "C100,100 250,100 250,200 S400,300 400,200 Z";
+
+    ok_path_t *path1 = ok_path_create();
+    ok_path_t *path2 = ok_path_create();
+
+    char *error;
+    if (!ok_path_append_svg(path1, svg_path, &error)) {
+        printf("Failure: %s: SVG parse error: %s\n", error, __func__);
+        ok_path_free(path1);
+        ok_path_free(path2);
+        return 1;
+    }
+
+    for (size_t i = 0; i < ok_subpath_count(path1); i++) {
+        ok_path_t *subpath = ok_subpath_create(path1, i);
+        ok_path_append(path2, subpath);
+        ok_path_free(subpath);
+    }
+
+    if (!ok_path_equals(path1, path2)) {
+        printf("Failure: %s: subpaths\n", __func__);
+        ok_path_free(path1);
+        ok_path_free(path2);
+        return 1;
+    }
+
+    printf("Success: %s\n", __func__);
+    ok_path_free(path1);
+    ok_path_free(path2);
+    return 0;
+}
+
 static int test_motion_path() {
     ok_path_t *path = ok_path_create();
 
@@ -203,5 +238,6 @@ static int test_motion_path() {
 }
 
 int main() {
-    return test_svg_parse() || test_iteration() || test_append_lines() || test_motion_path();
+    return (test_svg_parse() || test_iteration() || test_append_lines() || test_subpath() ||
+            test_motion_path());
 }
