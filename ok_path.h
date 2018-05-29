@@ -250,6 +250,22 @@ ok_path_t *ok_subpath_create(const ok_path_t *path, size_t index);
 ok_path_t *ok_subpath_flatten(const ok_path_t *path, size_t index);
 
 /**
+ * Gets the index of the first element of the specified subpath in the path.
+ * @param path The path.
+ * @param index The subpath index, from `0` to `count-1`, where `count` is the value returned from
+ *     #ok_subpath_count.
+ */
+size_t ok_subpath_first_element_index(const ok_path_t *path, size_t index);
+
+/**
+ * Gets the index of the last element of the specified subpath in the path.
+ * @param path The path.
+ * @param index The subpath index, from `0` to `count-1`, where `count` is the value returned from
+ *     #ok_subpath_count.
+ */
+size_t ok_subpath_last_element_index(const ok_path_t *path, size_t index);
+
+/**
  * Checks if a subpath is flat (consists of only #OK_PATH_MOVE_TO, #OK_PATH_LINE_TO, and
  * #OK_PATH_CLOSE elements).
  */

@@ -243,9 +243,16 @@ ok_path_t *ok_subpath_create(const ok_path_t *path, size_t index) {
     return new_path;
 }
 
+size_t ok_subpath_first_element_index(const ok_path_t *path, size_t index) {
+    return vector_at(&path->subpaths, index)->first_index;
+}
+
+size_t ok_subpath_last_element_index(const ok_path_t *path, size_t index) {
+    return vector_at(&path->subpaths, index)->last_index;
+}
+
 bool ok_subpath_is_flat(const ok_path_t *path, size_t index) {
-    const struct ok_subpath *subpath = vector_at(&path->subpaths, index);
-    return !subpath->has_curves;
+    return !vector_at(&path->subpaths, index)->has_curves;
 }
 
 // MARK: Modifying paths
