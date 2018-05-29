@@ -192,6 +192,12 @@ ok_path_t *ok_path_flatten(const ok_path_t *path);
 bool ok_path_equals(const ok_path_t *path1, const ok_path_t *path2);
 
 /**
+ * Checks if a path is flat (consists of only #OK_PATH_MOVE_TO, #OK_PATH_LINE_TO, and #OK_PATH_CLOSE
+ * elements).
+ */
+bool ok_path_is_flat(const ok_path_t *path);
+
+/**
  * Gets the number of elements in the path.
  */
 size_t ok_path_element_count(const ok_path_t *path);
@@ -242,6 +248,12 @@ ok_path_t *ok_subpath_create(const ok_path_t *path, size_t index);
  *     #ok_subpath_count.
  */
 ok_path_t *ok_subpath_flatten(const ok_path_t *path, size_t index);
+
+/**
+ * Checks if a subpath is flat (consists of only #OK_PATH_MOVE_TO, #OK_PATH_LINE_TO, and
+ * #OK_PATH_CLOSE elements).
+ */
+bool ok_subpath_is_flat(const ok_path_t *path, size_t index);
 
 // MARK: Motion paths
 

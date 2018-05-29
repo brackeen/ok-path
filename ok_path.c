@@ -90,6 +90,7 @@ struct ok_path_element {
 struct ok_subpath {
     size_t first_index;
     size_t last_index;
+    bool has_curves;
 };
 
 struct vector_of_path_elements vector_of(struct ok_path_element);
@@ -100,6 +101,7 @@ struct ok_path {
     double subpath_origin_x;
     double subpath_origin_y;
     bool active_subpath;
+    bool has_curves;
 };
 
 ok_path_t *ok_path_create() {
@@ -118,6 +120,7 @@ void ok_path_reset(ok_path_t *path) {
     path->subpath_origin_x = 0.0;
     path->subpath_origin_y = 0.0;
     path->active_subpath = false;
+    path->has_curves = false;
 }
 
 bool ok_path_equals(const ok_path_t *path1, const ok_path_t *path2) {
@@ -168,6 +171,10 @@ bool ok_path_equals(const ok_path_t *path1, const ok_path_t *path2) {
     return true;
 }
 
+bool ok_path_is_flat(const ok_path_t *path) {
+    return !path->has_curves;
+}
+
 size_t ok_path_element_count(const ok_path_t *path) {
     return path->elements.length;
 }
@@ -207,6 +214,8 @@ static double ok_path_last_y(const ok_path_t *path) {
     }
 }
 
+// MARK: Subpaths
+
 size_t ok_subpath_count(const ok_path_t *path) {
     return path->subpaths.length;
 }
@@ -226,11 +235,17 @@ ok_path_t *ok_subpath_create(const ok_path_t *path, size_t index) {
         struct ok_subpath *new_subpath = vector_push_new(&new_path->subpaths);
         new_subpath->first_index = 0;
         new_subpath->last_index = count - 1;
+        new_subpath->has_curves = subpath->has_curves;
     } else {
         ok_path_free(new_path);
         new_path = NULL;
     }
     return new_path;
+}
+
+bool ok_subpath_is_flat(const ok_path_t *path, size_t index) {
+    const struct ok_subpath *subpath = vector_at(&path->subpaths, index);
+    return !subpath->has_curves;
 }
 
 // MARK: Modifying paths
@@ -248,13 +263,16 @@ static struct ok_path_element * _ok_path_new_element(ok_path_t *path,
         }
         element = vector_push_new(&path->elements);
         element->type = type;
-        if (path->active_subpath) {
-            vector_last(&path->subpaths)->last_index = path->elements.length - 1;
-        } else {
+        if (!path->active_subpath) {
+            path->active_subpath = true;
             struct ok_subpath *subpath = vector_push_new(&path->subpaths);
             subpath->first_index = path->elements.length - 2;
-            subpath->last_index = path->elements.length - 1;
-            path->active_subpath = true;
+            subpath->has_curves = false;
+        }
+        vector_last(&path->subpaths)->last_index = path->elements.length - 1;
+        if (ok_path_type_is_curve(type)) {
+            path->has_curves = true;
+            vector_last(&path->subpaths)->has_curves = true;
         }
     }
     return element;
@@ -318,6 +336,7 @@ void ok_path_append(ok_path_t *path, const ok_path_t *path_to_append) {
             struct ok_subpath *subpath = vector_push_new(&path->subpaths);
             subpath->first_index = original_count + subpath_to_append->first_index;
             subpath->last_index = original_count + subpath_to_append->last_index;
+            subpath->has_curves = subpath_to_append->has_curves;
         }
     }
 }
