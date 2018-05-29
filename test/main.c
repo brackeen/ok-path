@@ -123,8 +123,8 @@ static int test_append_lines() {
     ok_path_t *path2;
 
     char *error;
-    const char *svg_path = "M 0,0 L 10,20, 40,20, 30,10, 50,0 Z";
-    if (!ok_path_append_svg(path1, svg_path, &error)) {
+    const char *svg_path_simple = "M 0,0 L 10,20, 40,20, 30,10, 50,0 Z";
+    if (!ok_path_append_svg(path1, svg_path_simple, &error)) {
         printf("Failure: %s: SVG parse error: %s\n", error, __func__);
         ok_path_free(path1);
         return 1;

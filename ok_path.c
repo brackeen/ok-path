@@ -970,7 +970,7 @@ static void _ok_path_add_segment(enum ok_path_element_type type, double x, doubl
     }
 }
 
-ok_path_t *_ok_path_flatten(const ok_path_t *path, size_t first_index, size_t last_index) {
+static ok_path_t *_ok_path_flatten(const ok_path_t *path, size_t first_index, size_t last_index) {
     size_t count = _ok_path_flatten_generic(path, first_index, last_index, NULL, NULL);
     ok_path_t *flattened_path = ok_path_create();
     if (!vector_ensure_capacity(&flattened_path->elements, count)) {
