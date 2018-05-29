@@ -328,6 +328,7 @@ void ok_path_close(ok_path_t *path) {
 void ok_path_append(ok_path_t *path, const ok_path_t *path_to_append) {
     size_t original_count = path->elements.length;
     size_t count = path_to_append->elements.length;
+    path->has_curves |= path_to_append->has_curves;
     if (vector_ensure_capacity(&path->elements, count)) {
         struct ok_path_element *values = path->elements.values;
         struct ok_path_element *src_values = path_to_append->elements.values;
@@ -983,12 +984,22 @@ ok_path_t *_ok_path_flatten(const ok_path_t *path, size_t first_index, size_t la
 }
 
 ok_path_t *ok_path_flatten(const ok_path_t *path) {
-    return _ok_path_flatten(path, 0, path->elements.length - 1);
+    if (path->has_curves) {
+        return _ok_path_flatten(path, 0, path->elements.length - 1);
+    } else {
+        ok_path_t *new_path = ok_path_create();
+        ok_path_append(new_path, path);
+        return new_path;
+    }
 }
 
 ok_path_t *ok_subpath_flatten(const ok_path_t *path, size_t index) {
     const struct ok_subpath *subpath = vector_at(&path->subpaths, index);
-    return _ok_path_flatten(path, subpath->first_index, subpath->last_index);
+    if (subpath->has_curves) {
+        return _ok_path_flatten(path, subpath->first_index, subpath->last_index);
+    } else {
+        return ok_subpath_create(path, index);
+    }
 }
 
 // MARK: Motion Paths
