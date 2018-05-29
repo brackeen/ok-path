@@ -933,6 +933,28 @@ static size_t _ok_path_flatten_generic(const ok_path_t *path, ok_add_segment_fun
     return count;
 }
 
+static void _ok_path_add_segment(enum ok_path_element_type type, double x, double y,
+                                 void *userData) {
+    ok_path_t *flattened_path = userData;
+    if (type == OK_PATH_MOVE_TO) {
+        ok_path_move_to(flattened_path, x, y);
+    } else {
+        ok_path_line_to(flattened_path, x, y);
+    }
+}
+
+ok_path_t *ok_path_flatten(const ok_path_t *path) {
+    size_t count = _ok_path_flatten_generic(path, NULL, NULL);
+    ok_path_t *flattened_path = ok_path_create();
+    if (!vector_ensure_capacity(&flattened_path->elements, count)) {
+        ok_path_free(flattened_path);
+        return NULL;
+    } else {
+        _ok_path_flatten_generic(path, _ok_path_add_segment, flattened_path);
+        return flattened_path;
+    }
+}
+
 // MARK: Motion Paths
 
 struct ok_motion_path_segment {

@@ -177,6 +177,11 @@ void ok_path_close(ok_path_t *path);
  */
 void ok_path_reset(ok_path_t *path);
 
+/**
+ * Creates a flattened version of this path.
+ */
+ok_path_t *ok_path_flatten(const ok_path_t *path);
+
 // MARK: Getting information about paths
 
 /**

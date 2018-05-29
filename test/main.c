@@ -158,11 +158,36 @@ static int test_append_lines() {
     return 0;
 }
 
-static int test_subpath() {
-    const char *svg_path = "M 100,100 L100,200 h-100 v-100-100 L0.25e-4,0.25E+2"
-        "M 0 0 a25,25 -30 0,1 50,-25 M 200,300 Q400,50 600,300 T1000,300 M 100,200 "
-        "C100,100 250,100 250,200 S400,300 400,200 Z";
+static int test_flatten() {
+    ok_path_t *path = ok_path_create();
 
+    char *error;
+    if (!ok_path_append_svg(path, svg_path, &error)) {
+        printf("Failure: %s: SVG parse error: %s\n", error, __func__);
+        ok_path_free(path);
+        return 1;
+    }
+
+    ok_path_t *flattened_path = ok_path_flatten(path);
+    for (size_t i = 0; i < ok_path_element_count(flattened_path); i++) {
+        double x, y;
+        enum ok_path_element_type type;
+        type = ok_path_element_get(flattened_path, i, NULL, NULL, NULL,NULL, &x, &y);
+        if (type != OK_PATH_MOVE_TO && type != OK_PATH_LINE_TO) {
+            printf("Failure: Flattened path contains curves: %s\n", __func__);
+            ok_path_free(path);
+            ok_path_free(flattened_path);
+            return 1;
+        }
+    }
+
+    printf("Success: %s\n", __func__);
+    ok_path_free(path);
+    ok_path_free(flattened_path);
+    return 0;
+}
+
+static int test_subpath() {
     ok_path_t *path1 = ok_path_create();
     ok_path_t *path2 = ok_path_create();
 
@@ -226,6 +251,6 @@ static int test_motion_path() {
 }
 
 int main() {
-    return (test_svg_parse() || test_iteration() || test_append_lines() || test_subpath() ||
-            test_motion_path());
+    return (test_svg_parse() || test_iteration() || test_append_lines() || test_flatten() ||
+            test_subpath() || test_motion_path());
 }
