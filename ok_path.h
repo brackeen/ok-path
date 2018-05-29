@@ -178,7 +178,8 @@ void ok_path_close(ok_path_t *path);
 void ok_path_reset(ok_path_t *path);
 
 /**
- * Creates a flattened version of this path.
+ * Creates a flattened version of this path. All curved segments of the path are converted to a
+ * series of straight lines that approximates the curve.
  */
 ok_path_t *ok_path_flatten(const ok_path_t *path);
 
@@ -242,7 +243,9 @@ size_t ok_subpath_count(const ok_path_t *path);
 ok_path_t *ok_subpath_create(const ok_path_t *path, size_t index);
 
 /**
- * Creates a flattened version of a subpath.
+ * Creates a flattened version of a subpath. All curved segments of the subpath are converted to a
+ * series of straight lines that approximates the curve.
+ *
  * @param path The path.
  * @param index The subpath index, from `0` to `count-1`, where `count` is the value returned from
  *     #ok_subpath_count.
