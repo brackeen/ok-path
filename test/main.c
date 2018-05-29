@@ -4,6 +4,22 @@
 #include <stdlib.h>
 #include <string.h>
 
+static const char *svg_path =
+    "M 100,100"
+    "L100,200 "
+    "h-100, " // Test superfluous comma
+    "v-100-100 " // Test no space or comma before negative number
+    "L0.25e-4,0.25E+2" // Test exponents
+    "M 0 0 a25,25 -30 0,1 50,-25 "
+    "M 200,300 Q400,50 600,300 T1000,300"
+    "M 100,200 C100,100 250,100 250,200 S400,300 400,200"
+    "Z";
+
+static const double svg_path_start_x = 100;
+static const double svg_path_start_y = 100;
+static const double svg_path_end_x = 100;
+static const double svg_path_end_y = 200;
+
 static int test_svg_parse() {
     ok_path_t *path1 = ok_path_create();
     ok_path_t *path2 = ok_path_create();
@@ -17,18 +33,6 @@ static int test_svg_parse() {
     }
 
     char *error;
-
-    // Test if the SVG path is identical to the programatically constructed path.
-    const char *svg_path = "M 100,100"
-                           "L100,200 "
-                           "h-100, " // Test superfluous comma
-                           "v-100-100 " // Test no space or comma before negative number
-                           "L0.25e-4,0.25E+2" // Test exponents
-                           "M 0 0 a25,25 -30 0,1 50,-25 "
-                           "M 200,300 Q400,50 600,300 T1000,300"
-                           "M 100,200 C100,100 250,100 250,200 S400,300 400,200"
-                           "Z";
-
     if (!ok_path_append_svg(path1, svg_path, &error)) {
         printf("Failure: %s: SVG parse error: %s\n", error, __func__);
         ok_path_free(path1);
@@ -53,7 +57,8 @@ static int test_svg_parse() {
     ok_path_close(path2);
 
     if (!ok_path_equals(path1, path2)) {
-        printf("Failure: %s: Paths not equal\n", __func__);
+        printf("Failure: %s: SVG path is not identical to programatically constructed path.\n",
+               __func__);
         ok_path_free(path1);
         ok_path_free(path2);
         return 1;
@@ -69,21 +74,13 @@ static int test_iteration() {
     ok_path_t *path1 = ok_path_create();
     ok_path_t *path2 = ok_path_create();
 
-    ok_path_move_to(path2, 100, 100);
-    ok_path_line_to(path2, 100, 200);
-    ok_path_line_to(path2, 0, 200);
-    ok_path_line_to(path2, 0, 100);
-    ok_path_line_to(path2, 0, 0);
-    ok_path_line_to(path2, 0.25e-4, 0.25e+2);
-    ok_path_move_to(path2, 0, 0);
-    ok_path_elliptical_arc_to(path2, 25, 25, -30 * M_PI / 180, false, true, 50, -25);
-    ok_path_move_to(path2, 200, 300);
-    ok_path_quad_curve_to(path2, 400, 50, 600, 300);
-    ok_path_quad_curve_to(path2, 800, 550, 1000, 300);
-    ok_path_move_to(path2, 100, 200);
-    ok_path_curve_to(path2, 100, 100, 250, 100, 250, 200);
-    ok_path_curve_to(path2, 250, 300, 400, 300, 400, 200);
-    ok_path_close(path2);
+    char *error;
+    if (!ok_path_append_svg(path2, svg_path, &error)) {
+        printf("Failure: %s: SVG parse error: %s\n", error, __func__);
+        ok_path_free(path1);
+        ok_path_free(path2);
+        return 1;
+    }
 
     for (size_t i = 0; i < ok_path_element_count(path2); i++) {
         double cx1, cy1;
@@ -200,15 +197,6 @@ static int test_motion_path() {
     ok_path_t *path = ok_path_create();
 
     char *error;
-
-    const double start_x = 100;
-    const double start_y = 100;
-    const double end_x = 100;
-    const double end_y = 200;
-    const char *svg_path = "M 100,100 L100,200 h-100 v-100-100 L0.25e-4,0.25E+2"
-        "M 0 0 a25,25 -30 0,1 50,-25 M 200,300 Q400,50 600,300 T1000,300 M 100,200 "
-        "C100,100 250,100 250,200 S400,300 400,200 Z";
-
     if (!ok_path_append_svg(path, svg_path, &error)) {
         printf("Failure: %s: SVG parse error: %s\n", error, __func__);
         ok_path_free(path);
@@ -220,13 +208,13 @@ static int test_motion_path() {
 
     double x, y;
     ok_motion_path_location(motion_path, 0.0, &x, &y, NULL);
-    if (x != start_x || y != start_y) {
+    if (x != svg_path_start_x || y != svg_path_start_y) {
         printf("Failure: Flattened path error (start): %s\n", __func__);
         ok_motion_path_free(motion_path);
         return 1;
     }
     ok_motion_path_location(motion_path, 1.0, &x, &y, NULL);
-    if (x != end_x || y != end_y) {
+    if (x != svg_path_end_x || y != svg_path_end_y) {
         printf("Failure: Flattened path error (end): %s\n", __func__);
         ok_motion_path_free(motion_path);
         return 1;
