@@ -902,12 +902,12 @@ static size_t _ok_path_flatten_curve(ok_add_segment_func func, void *userData,
     return num_segments1 + num_segments2 + num_segments3 + num_segments4;
 }
 
-static size_t _ok_path_flatten_generic(const ok_path_t *path, ok_add_segment_func func,
-                                       void *userData) {
+static size_t _ok_path_flatten_generic(const ok_path_t *path, size_t first_index, size_t last_index,
+                                       ok_add_segment_func func, void *userData) {
     double x = 0.0;
     double y = 0.0;
     size_t count = 0;
-    for (size_t i = 0; i < path->elements.length; i++) {
+    for (size_t i = first_index; i <= last_index; i++) {
         struct ok_path_element *element = &path->elements.values[i];
         if (element->type == OK_PATH_QUAD_CURVE_TO) {
             double cx1 = (x + element->cx1 * 2.0) / 3.0;
@@ -943,16 +943,26 @@ static void _ok_path_add_segment(enum ok_path_element_type type, double x, doubl
     }
 }
 
-ok_path_t *ok_path_flatten(const ok_path_t *path) {
-    size_t count = _ok_path_flatten_generic(path, NULL, NULL);
+ok_path_t *_ok_path_flatten(const ok_path_t *path, size_t first_index, size_t last_index) {
+    size_t count = _ok_path_flatten_generic(path, first_index, last_index, NULL, NULL);
     ok_path_t *flattened_path = ok_path_create();
     if (!vector_ensure_capacity(&flattened_path->elements, count)) {
         ok_path_free(flattened_path);
         return NULL;
     } else {
-        _ok_path_flatten_generic(path, _ok_path_add_segment, flattened_path);
+        _ok_path_flatten_generic(path, first_index, last_index,
+                                 _ok_path_add_segment, flattened_path);
         return flattened_path;
     }
+}
+
+ok_path_t *ok_path_flatten(const ok_path_t *path) {
+    return _ok_path_flatten(path, 0, path->elements.length - 1);
+}
+
+ok_path_t *ok_subpath_flatten(const ok_path_t *path, size_t index) {
+    const struct ok_subpath *subpath = vector_at(&path->subpaths, index);
+    return _ok_path_flatten(path, subpath->first_index, subpath->last_index);
 }
 
 // MARK: Motion Paths
@@ -1012,13 +1022,16 @@ static void _ok_motion_path_add_segment(enum ok_path_element_type type, double x
 }
 
 ok_motion_path_t *ok_motion_path_create(const ok_path_t *path) {
-    size_t count = _ok_path_flatten_generic(path, NULL, NULL);
+    size_t first_index = 0;
+    size_t last_index = path->elements.length - 1;
+    size_t count = _ok_path_flatten_generic(path, first_index, last_index, NULL, NULL);
     ok_motion_path_t *out_path = calloc(1, sizeof(ok_motion_path_t));
     if (!vector_ensure_capacity(&out_path->segments, count)) {
         ok_motion_path_free(out_path);
         return NULL;
     } else {
-        _ok_path_flatten_generic(path, _ok_motion_path_add_segment, out_path);
+        _ok_path_flatten_generic(path, first_index, last_index,
+                                 _ok_motion_path_add_segment, out_path);
         return out_path;
     }
 }

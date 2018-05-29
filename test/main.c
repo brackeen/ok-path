@@ -168,22 +168,38 @@ static int test_flatten() {
         return 1;
     }
 
-    ok_path_t *flattened_path = ok_path_flatten(path);
-    for (size_t i = 0; i < ok_path_element_count(flattened_path); i++) {
+    ok_path_t *flattened_path1 = ok_path_flatten(path);
+    for (size_t i = 0; i < ok_path_element_count(flattened_path1); i++) {
         double x, y;
         enum ok_path_element_type type;
-        type = ok_path_element_get(flattened_path, i, NULL, NULL, NULL,NULL, &x, &y);
+        type = ok_path_element_get(flattened_path1, i, NULL, NULL, NULL,NULL, &x, &y);
         if (type != OK_PATH_MOVE_TO && type != OK_PATH_LINE_TO) {
             printf("Failure: Flattened path contains curves: %s\n", __func__);
             ok_path_free(path);
-            ok_path_free(flattened_path);
+            ok_path_free(flattened_path1);
             return 1;
         }
     }
 
+    ok_path_t *flattened_path2 = ok_path_create();
+    for (size_t i = 0; i < ok_subpath_count(path); i++) {
+        ok_path_t *subpath = ok_subpath_flatten(path, i);
+        ok_path_append(flattened_path2, subpath);
+        ok_path_free(subpath);
+    }
+
+    if (!ok_path_equals(flattened_path1, flattened_path2)) {
+        printf("Failure: %s: flattened subpaths\n", __func__);
+        ok_path_free(path);
+        ok_path_free(flattened_path1);
+        ok_path_free(flattened_path2);
+        return 1;
+    }
+
     printf("Success: %s\n", __func__);
     ok_path_free(path);
-    ok_path_free(flattened_path);
+    ok_path_free(flattened_path1);
+    ok_path_free(flattened_path2);
     return 0;
 }
 

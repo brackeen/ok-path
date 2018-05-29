@@ -235,6 +235,14 @@ size_t ok_subpath_count(const ok_path_t *path);
  */
 ok_path_t *ok_subpath_create(const ok_path_t *path, size_t index);
 
+/**
+ * Creates a flattened version of a subpath.
+ * @param path The path.
+ * @param index The subpath index, from `0` to `count-1`, where `count` is the value returned from
+ *     #ok_subpath_count.
+ */
+ok_path_t *ok_subpath_flatten(const ok_path_t *path, size_t index);
+
 // MARK: Motion paths
 
 /**
