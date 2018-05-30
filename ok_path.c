@@ -231,6 +231,7 @@ ok_path_t *ok_subpath_create(const ok_path_t *path, size_t index) {
         new_path->elements.length += count;
         new_path->subpath_origin_x = src_values[0].x;
         new_path->subpath_origin_y = src_values[0].y;
+        new_path->active_subpath = false;
 
         struct ok_subpath *new_subpath = vector_push_new(&new_path->subpaths);
         new_subpath->first_index = 0;
@@ -265,21 +266,24 @@ static struct ok_path_element * _ok_path_new_element(ok_path_t *path,
         element = vector_push_new(&path->elements);
         element->type = type;
     } else {
-        if (path->elements.length == 0) {
-            ok_path_move_to(path, 0.0, 0.0);
+        if (!path->active_subpath) {
+            if (path->elements.length == 0 ||
+                vector_last(&path->elements)->type != OK_PATH_MOVE_TO) {
+                ok_path_move_to(path, path->subpath_origin_x, path->subpath_origin_y);
+            }
+            struct ok_subpath *subpath = vector_push_new(&path->subpaths);
+            subpath->first_index = path->elements.length - 1;
+            subpath->has_curves = false;
+            path->active_subpath = true;
         }
         element = vector_push_new(&path->elements);
         element->type = type;
-        if (!path->active_subpath) {
-            path->active_subpath = true;
-            struct ok_subpath *subpath = vector_push_new(&path->subpaths);
-            subpath->first_index = path->elements.length - 2;
-            subpath->has_curves = false;
-        }
         vector_last(&path->subpaths)->last_index = path->elements.length - 1;
         if (ok_path_type_is_curve(type)) {
             path->has_curves = true;
             vector_last(&path->subpaths)->has_curves = true;
+        } else if (type == OK_PATH_CLOSE) {
+            path->active_subpath = false;
         }
     }
     return element;
@@ -337,6 +341,7 @@ void ok_path_append(ok_path_t *path, const ok_path_t *path_to_append) {
         path->elements.length += count;
         path->subpath_origin_x = path_to_append->subpath_origin_x;
         path->subpath_origin_y = path_to_append->subpath_origin_y;
+        path->active_subpath = path_to_append->active_subpath;
 
         // Subpaths
         for (size_t i = 0; i < path_to_append->subpaths.length; i++) {
@@ -353,13 +358,9 @@ void ok_path_append_lines(ok_path_t *path, const double (*points)[2], size_t num
     struct vector_of_path_elements *path_elements = &path->elements;
     if (num_points > 0 && vector_ensure_capacity(path_elements, num_points)) {
         ok_path_move_to(path, (*points)[0], (*points)[1]);
-        points++;
-
         for (size_t i = 1; i < num_points; i++) {
-            struct ok_path_element *element = _ok_path_new_element(path, OK_PATH_LINE_TO);
-            element->x = (*points)[0];
-            element->y = (*points)[1];
             points++;
+            ok_path_line_to(path, (*points)[0], (*points)[1]);
         }
     }
 }
@@ -965,6 +966,10 @@ static void _ok_path_add_segment(enum ok_path_element_type type, double x, doubl
     ok_path_t *flattened_path = userData;
     if (type == OK_PATH_MOVE_TO) {
         ok_path_move_to(flattened_path, x, y);
+    } else if (type == OK_PATH_CLOSE) {
+        flattened_path->subpath_origin_x = x;
+        flattened_path->subpath_origin_y = y;
+        ok_path_close(flattened_path);
     } else {
         ok_path_line_to(flattened_path, x, y);
     }

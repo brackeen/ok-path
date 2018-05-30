@@ -173,7 +173,7 @@ static int test_flatten() {
         double x, y;
         enum ok_path_element_type type;
         type = ok_path_element_get(flattened_path1, i, NULL, NULL, NULL,NULL, &x, &y);
-        if (type != OK_PATH_MOVE_TO && type != OK_PATH_LINE_TO) {
+        if (type != OK_PATH_MOVE_TO && type != OK_PATH_LINE_TO && type != OK_PATH_CLOSE) {
             printf("Failure: Flattened path contains curves: %s\n", __func__);
             ok_path_free(path);
             ok_path_free(flattened_path1);
