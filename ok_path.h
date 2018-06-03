@@ -226,6 +226,24 @@ enum ok_path_element_type ok_path_element_get(const ok_path_t *path, size_t inde
                                               double *out_cx2, double *out_cy2,
                                               double *out_x, double *out_y);
 
+/**
+ * Sets the points associated with an element in the path.
+ * @param index The element index, from `0` to `count-1`, where `count` is the value returned from
+ *     #ok_path_element_count.
+ * @param cx1 The x location of the first control point. This value is only used if the
+ *     element type is #OK_PATH_QUAD_CURVE_TO or #OK_PATH_CUBIC_CURVE_TO.
+ * @param cy1 The y location of the first control point. This value is only used if the
+ *     element type is #OK_PATH_QUAD_CURVE_TO or #OK_PATH_CUBIC_CURVE_TO.
+ * @param cx2 The x location of the second control point. This value is only used if the
+ *     element type is #OK_PATH_CUBIC_CURVE_TO.
+ * @param cy2 The y location of the second control point. This value is only used if the
+ *     element type is #OK_PATH_CUBIC_CURVE_TO.
+ * @param x The x location of the element's end point.
+ * @param y The y location of the element's end point.
+ */
+void ok_path_element_set(const ok_path_t *path, size_t index,
+                         double cx1, double cy1, double cx2, double cy2, double x, double y);
+
 // MARK: Subpaths
 
 /**

@@ -198,6 +198,17 @@ enum ok_path_element_type ok_path_element_get(const ok_path_t *path, size_t inde
     return element->type;
 }
 
+void ok_path_element_set(const ok_path_t *path, size_t index,
+                         double cx1, double cy1, double cx2, double cy2, double x, double y) {
+    struct ok_path_element *element = path->elements.values + index;
+    element->cx1 = cx1;
+    element->cy1 = cy1;
+    element->cx2 = cx2;
+    element->cy2 = cy2;
+    element->x = x;
+    element->y = y;
+}
+
 static double ok_path_last_x(const ok_path_t *path) {
     if (path->elements.length) {
         return vector_last(&path->elements)->x;
