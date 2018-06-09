@@ -340,25 +340,32 @@ void ok_path_close(ok_path_t *path) {
 }
 
 void ok_path_append(ok_path_t *path, const ok_path_t *path_to_append) {
-    size_t original_count = path->elements.length;
     size_t count = path_to_append->elements.length;
-    path->has_curves |= path_to_append->has_curves;
     if (vector_ensure_capacity(&path->elements, count)) {
-        struct ok_path_element *values = path->elements.values;
-        struct ok_path_element *src_values = path_to_append->elements.values;
-        struct ok_path_element *dst_values = &values[path->elements.length];
-        memcpy(dst_values, src_values, count * sizeof(struct ok_path_element));
-        path->elements.length += count;
-        path->subpath_origin_x = path_to_append->subpath_origin_x;
-        path->subpath_origin_y = path_to_append->subpath_origin_y;
-
-        // Subpaths
-        for (size_t i = 0; i < path_to_append->subpaths.length; i++) {
-            struct ok_subpath *subpath_to_append = vector_at(&path_to_append->subpaths, i);
-            struct ok_subpath *subpath = vector_push_new(&path->subpaths);
-            subpath->first_index = original_count + subpath_to_append->first_index;
-            subpath->last_index = original_count + subpath_to_append->last_index;
-            subpath->has_curves = subpath_to_append->has_curves;
+        // Append one element at a time, because elements are "commands" that may have different
+        // meaning depending on the previous elements. For example, the first command of the
+        // appended path could be line-to, which could (or could not) create a new subpath,
+        // depending on context.
+        for (size_t i = 0; i < count; i++) {
+            struct ok_path_element *element = path_to_append->elements.values + i;
+            switch (element->type) {
+                case OK_PATH_MOVE_TO:
+                    ok_path_move_to(path, element->x, element->y);
+                    break;
+                case OK_PATH_LINE_TO:
+                    ok_path_line_to(path, element->x, element->y);
+                    break;
+                case OK_PATH_QUAD_CURVE_TO:
+                    ok_path_quad_curve_to(path, element->cx1, element->cy1, element->x, element->y);
+                    break;
+                case OK_PATH_CUBIC_CURVE_TO:
+                    ok_path_curve_to(path, element->cx1, element->cy1, element->cx2, element->cy2,
+                                     element->x, element->y);
+                    break;
+                case OK_PATH_CLOSE:
+                    ok_path_close(path);
+                    break;
+            }
         }
     }
 }
