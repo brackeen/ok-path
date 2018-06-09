@@ -363,10 +363,15 @@ void ok_path_append(ok_path_t *path, const ok_path_t *path_to_append) {
     }
 }
 
-void ok_path_append_lines(ok_path_t *path, const double (*points)[2], size_t num_points) {
+void ok_path_append_lines(ok_path_t *path, enum ok_path_element_type first_type,
+                          const double (*points)[2], size_t num_points) {
     struct vector_of_path_elements *path_elements = &path->elements;
     if (num_points > 0 && vector_ensure_capacity(path_elements, num_points)) {
-        ok_path_move_to(path, (*points)[0], (*points)[1]);
+        if (first_type == OK_PATH_MOVE_TO) {
+            ok_path_move_to(path, (*points)[0], (*points)[1]);
+        } else {
+            ok_path_line_to(path, (*points)[0], (*points)[1]);
+        }
         for (size_t i = 1; i < num_points; i++) {
             points++;
             ok_path_line_to(path, (*points)[0], (*points)[1]);
