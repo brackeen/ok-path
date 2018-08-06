@@ -266,7 +266,44 @@ static int test_motion_path() {
     return 0;
 }
 
+static int test_pslg() {
+    ok_path_t *path1 = ok_path_create();
+    ok_path_t *path2 = ok_path_create();
+
+    char *error;
+    if (!ok_path_append_svg(path1, svg_path, &error)) {
+        printf("Failure: %s: SVG parse error: %s\n", error, __func__);
+        ok_path_free(path1);
+        ok_path_free(path2);
+        return 1;
+    }
+
+    float *points = NULL;
+    size_t *segments = NULL;
+    size_t num_points = 0;
+    size_t num_segments = 0;
+    ok_path_create_pslg(path1, &points, &num_points, &segments, &num_segments);
+    ok_path_append_pslg(path2, points, segments, num_segments);
+    free(points);
+    free(segments);
+
+    ok_path_t *path1_flattened = ok_path_flatten(path1);
+    ok_path_free(path1);
+
+    if (!ok_path_equals(path1_flattened, path2)) {
+        printf("Failure: %s: pslg\n", __func__);
+        ok_path_free(path1_flattened);
+        ok_path_free(path2);
+        return 1;
+    }
+
+    printf("Success: %s\n", __func__);
+    ok_path_free(path1_flattened);
+    ok_path_free(path2);
+    return 0;
+}
+
 int main() {
     return (test_svg_parse() || test_iteration() || test_append_lines() || test_flatten() ||
-            test_subpath() || test_motion_path());
+            test_subpath() || test_motion_path() || test_pslg());
 }

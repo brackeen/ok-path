@@ -121,7 +121,13 @@ void ok_path_reset(ok_path_t *path) {
     path->has_curves = false;
 }
 
+static bool _ok_equals(double a, double b) {
+    // Could be improved by using an epislon or something better.
+    return (float)a == (float)b;
+}
+
 bool ok_path_equals(const ok_path_t *path1, const ok_path_t *path2) {
+
     if (path1->elements.length != path2->elements.length ||
         path1->subpaths.length != path2->subpaths.length) {
         return false;
@@ -146,18 +152,22 @@ bool ok_path_equals(const ok_path_t *path1, const ok_path_t *path2) {
             case OK_PATH_LINE_TO:
             case OK_PATH_MOVE_TO:
             case OK_PATH_CLOSE:
-                if (element1->x != element2->x || element1->y != element2->y) {
+                if (!_ok_equals(element1->x, element2->x) ||
+                    !_ok_equals(element1->y, element2->y)) {
                     return false;
                 }
                 break;
             case OK_PATH_QUAD_CURVE_TO:
-                if (element1->cx1 != element2->cx1 || element1->cy1 != element2->cy1) {
+                if (!_ok_equals(element1->cx1, element2->cx1) ||
+                    !_ok_equals(element1->cy1, element2->cy1)) {
                     return false;
                 }
                 break;
             case OK_PATH_CUBIC_CURVE_TO:
-                if (element1->cx1 != element2->cx1 || element1->cy1 != element2->cy1 ||
-                    element1->cx2 != element2->cx2 || element1->cy2 != element2->cy2) {
+                if (!_ok_equals(element1->cx1, element2->cx1) ||
+                    !_ok_equals(element1->cy1, element2->cy1) ||
+                    !_ok_equals(element1->cx2, element2->cx2) ||
+                    !_ok_equals(element1->cy2, element2->cy2)) {
                     return false;
                 }
                 break;
@@ -953,6 +963,16 @@ static size_t _ok_path_flatten_curve(ok_add_point_func add_point, void *userData
 
 static size_t _ok_path_flatten_generic(const ok_path_t *path, size_t first_index, size_t last_index,
                                        ok_add_point_func add_point, void *userData) {
+    if (ok_path_is_flat(path)) {
+        if (add_point) {
+            for (size_t i = first_index; i <= last_index; i++) {
+                struct ok_path_element *element = &path->elements.values[i];
+                add_point(element->type, element->x, element->y, userData);
+            }
+        }
+        return last_index - first_index + 1;
+    }
+    
     double x = 0.0;
     double y = 0.0;
     size_t count = 0;
@@ -1213,5 +1233,169 @@ void ok_motion_path_location(const ok_motion_path_t *path, double p,
                 }
             }
         }
+    }
+}
+
+// MARK: Planar straight-line graph
+
+struct ok_pslg_context {
+    float *points;
+    size_t num_points;
+    size_t max_points;
+
+    void *segments;
+    size_t num_segments;
+    size_t max_segments;
+
+    size_t index_size;
+};
+
+static bool _ok_index_size_valid(size_t index_size) {
+    // On 32-bit targets, index_size must be 1, 2, or 4.
+    // On 64-bit targets, index_size must be 1, 2, 4, or 8.
+    size_t test_index_size = 1;
+    while (test_index_size <= sizeof(size_t)) {
+        if (index_size == test_index_size) {
+            return true;
+        } else {
+            test_index_size <<= 1;
+        }
+    }
+    return false;
+}
+
+static void _ok_pslg_add_point(enum ok_path_element_type type, double x, double y, void *userData) {
+    struct ok_pslg_context *context = userData;
+    if (context->num_points < context->max_points) {
+        // Add point
+        size_t i = context->num_points * 2;
+        context->points[i] = (float)x;
+        context->points[i + 1] = (float)y;
+
+        // Add segment
+        if (type != OK_PATH_MOVE_TO && context->num_points > 0 &&
+            context->num_segments < context->max_segments) {
+            i = context->num_segments * 2;
+            switch (context->index_size) {
+                case 1: {
+                    uint8_t *segments = context->segments;
+                    segments[i] = (uint8_t)context->num_points - 1;
+                    segments[i + 1] = (uint8_t)context->num_points;
+                    break;
+                }
+                case 2: {
+                    uint16_t *segments = context->segments;
+                    segments[i] = (uint16_t)context->num_points - 1;
+                    segments[i + 1] = (uint16_t)context->num_points;
+                    break;
+                }
+                case 4: {
+                    uint32_t *segments = context->segments;
+                    segments[i] = (uint32_t)context->num_points - 1;
+                    segments[i + 1] = (uint32_t)context->num_points;
+                    break;
+                }
+                case 8: {
+                    uint64_t *segments = context->segments;
+                    segments[i] = (uint64_t)context->num_points - 1;
+                    segments[i + 1] = (uint64_t)context->num_points;
+                    break;
+                }
+            }
+            context->num_segments++;
+        }
+
+        context->num_points++;
+    }
+}
+
+void ok_path_create_pslg_generic(const ok_path_t *path, size_t index_size, float **out_points,
+                                 size_t *out_num_points, void **out_segment_indices,
+                                 size_t *out_num_segments) {
+    // Validate input
+    if (!_ok_index_size_valid(index_size) || path->elements.length == 0) {
+        *out_points = NULL;
+        *out_segment_indices = NULL;
+        *out_num_points = 0;
+        *out_num_segments = 0;
+        return;
+    }
+
+    size_t first_index = 0;
+    size_t last_index = path->elements.length - 1;
+
+    // Initialize context
+    struct ok_pslg_context context;
+    context.index_size = index_size;
+    context.points = NULL;
+    context.segments = NULL;
+    context.num_points = 0;
+    context.num_segments = 0;
+    context.max_points = _ok_path_flatten_generic(path, first_index, last_index, NULL, NULL);
+    context.max_segments = MIN((context.max_points - 1), (1 << (index_size * 8 - 1)));
+
+    // Allocate
+    context.points = malloc(context.max_points * sizeof(float[2]));
+    context.segments = malloc(context.max_segments * 2 * index_size);
+    if (!context.points || !context.segments) {
+        free(context.points);
+        free(context.segments);
+        *out_points = NULL;
+        *out_segment_indices = NULL;
+        *out_num_points = 0;
+        *out_num_segments = 0;
+        return;
+    }
+
+    // Convert
+    _ok_path_flatten_generic(path, first_index, last_index, _ok_pslg_add_point, &context);
+    *out_points = context.points;
+    *out_num_points = context.num_points;
+    *out_segment_indices = context.segments;
+    *out_num_segments = context.num_segments;
+}
+
+void ok_path_append_pslg_generic(ok_path_t *path, size_t index_size, const float *points,
+                                 const void *segments, size_t num_segments) {
+    if (!_ok_index_size_valid(index_size) || num_segments == 0) {
+        return;
+    }
+    size_t last_segment = (size_t)-1;
+    for (size_t i = 0; i < num_segments; i++) {
+        size_t p1 = 0;
+        size_t p2 = 0;
+        switch (index_size) {
+            case 1: {
+                const uint8_t *segments8 = segments;
+                p1 = segments8[i * 2];
+                p2 = segments8[i * 2 + 1];
+                break;
+            }
+            case 2: {
+                const uint16_t *segments16 = segments;
+                p1 = segments16[i * 2];
+                p2 = segments16[i * 2 + 1];
+                break;
+            }
+            case 4: {
+                const uint32_t *segments32 = segments;
+                p1 = segments32[i * 2];
+                p2 = segments32[i * 2 + 1];
+                break;
+            }
+            case 8: {
+                const uint64_t *segments64 = segments;
+                p1 = segments64[i * 2];
+                p2 = segments64[i * 2 + 1];
+                break;
+            }
+        }
+
+        if (p1 != last_segment) {
+            ok_path_move_to(path, (double)points[p1 * 2], (double)points[p1 * 2 + 1]);
+        }
+        ok_path_line_to(path, (double)points[p2 * 2], (double)points[p2 * 2 + 1]);
+
+        last_segment = p2;
     }
 }

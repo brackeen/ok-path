@@ -325,6 +325,92 @@ double ok_motion_path_length(const ok_motion_path_t *path);
 void ok_motion_path_location(const ok_motion_path_t *path, double p,
                              double *out_x, double *out_y, double *out_angle);
 
+// MARK: Planar straight-line graph
+
+/**
+ * Converts a path to a planar straight-line graph, flattening if needed.
+ *
+ * This function returns a newly allocated array of points and a newly allocated array of segment
+ * indices. Each segment is a pair of indices of the point array, and the segments are in the same
+ * order as the path.
+ *
+ * This function is the same as #ok_path_to_pslg but using a generic size for segment indices.
+ *
+ * @param path The path.
+ * @param index_size The size, in bytes, of the point indices. The value `sizeof(uint16_t)` will
+ *     allow up to 65536 points. On 32-bit targets, this value must be 1, 2, or 4. On 64-bit
+ *     targets, this value must be 1, 2, 4, or 8.
+ * @param[out] out_points The location to return a newly allocated array of points. The length of
+ *     the array will be `out_num_points * sizeof(float[2])`. The array should be freed by the
+ *     caller.
+ * @param[out] out_num_points The number of points returned.
+ * @param[out] out_segment_indices The location to return a newly allocated array of segment
+ *     indices. The length of the array will be `out_num_segments * 2 * index_size`. The array
+ *     should be freed by the caller.
+ * @param[out] out_num_segments The number of segments returned.
+ */
+void ok_path_create_pslg_generic(const ok_path_t *path, size_t index_size, float **out_points,
+                                 size_t *out_num_points, void **out_segment_indices,
+                                 size_t *out_num_segments);
+
+/**
+ * Converts a path to a planar straight-line graph, flattening if needed.
+ *
+ * This function returns a newly allocated array of points and a newly allocated array of segment
+ * indices. Each segment is a pair of indices of the point array, and the segments are in the same
+ * order as the path.
+ *
+ * This function is the same as #ok_path_to_pslg_generic using segment indices of type `size_t`.
+ *
+ * @param path The path.
+ * @param[out] out_points The location to return a newly allocated array of points. The length of
+ *     the array will be `out_num_points * sizeof(float[2])`. The array should be freed by the
+ *     caller.
+ * @param[out] out_num_points The number of points returned.
+ * @param[out] out_segment_indices The location to return a newly allocated array of segment
+ *     indices. The length of the array will be `out_num_segments * 2`. The array should be freed
+ *     by the caller.
+ * @param[out] out_num_segments The number of segments returned.
+ */
+static inline void ok_path_create_pslg(const ok_path_t *path,
+                                       float **out_points, size_t *out_num_points,
+                                       size_t **out_segment_indices, size_t *out_num_segments) {
+    ok_path_create_pslg_generic(path, sizeof(**out_segment_indices), out_points, out_num_points,
+                                (void **)out_segment_indices, out_num_segments);
+}
+
+/**
+ * Appends a planar straight-line graph to this path.
+ *
+ * This function is the same as #ok_path_append_pslg but using a generic size for segment indices.
+ *
+ * @param path The path.
+ * @param index_size The size, in bytes, of the point indices. On 32-bit targets, this value must
+ *     be 1, 2, or 4. On 64-bit targets, this value must be 1, 2, 4, or 8.
+ * @param points The array of points.
+ * @param segments The segment indices. Each segment is specified by two indices into the point
+ *     array. The length of this array should be `num_segments * 2 * index_size`.
+ * @param num_segments The number of segments.
+ */
+void ok_path_append_pslg_generic(ok_path_t *path, size_t index_size, const float *points,
+                                 const void *segments, size_t num_segments);
+
+/**
+ * Appends a planar straight-line graph to this path.
+ *
+ * This function is the same as #ok_path_append_pslg_generic using segment indices of type `size_t`.
+ *
+ * @param path The path.
+ * @param points The array of points.
+ * @param segments The segment indices. Each segment is specified by two indices into the point
+ *     array. The length of this array should be `num_segments * 2`.
+ * @param num_segments The number of segments.
+ */
+static inline void ok_path_append_pslg(ok_path_t *path, const float *points,
+                                       const size_t *segments, size_t num_segments) {
+    ok_path_append_pslg_generic(path, sizeof(*segments), points, segments, num_segments);
+}
+
 #ifdef __cplusplus
 }
 #endif
