@@ -795,8 +795,8 @@ bool ok_path_append_svg(ok_path_t *path, const char *svg_path, char **out_error_
 
 // MARK: Path flattening
 
-typedef void (*ok_add_segment_func)(enum ok_path_element_type type, double x, double y,
-                                    void *userData);
+typedef void (*ok_add_point_func)(enum ok_path_element_type type, double x, double y,
+                                  void *userData);
 
 static double _ok_approx_dist(double px, double py, double ax, double ay,
                               double bx, double by) {
@@ -843,7 +843,7 @@ static size_t _ok_num_segments(double x0, double y0, double x1, double y1,
     return num_segments;
 }
 
-static void _ok_path_flatten_curve_division(ok_add_segment_func func, void *userData,
+static void _ok_path_flatten_curve_division(ok_add_point_func add_point, void *userData,
                                             enum ok_path_element_type type,
                                             size_t num_segments,
                                             double x0, double y0, double x1, double y1,
@@ -879,13 +879,13 @@ static void _ok_path_flatten_curve_division(ok_add_segment_func func, void *user
         yfdd += yfddd;
         yfdd2 += yfddd2;
 
-        func(type, xf, yf, userData);
+        add_point(type, xf, yf, userData);
     }
 
-    func(type, x3, y3, userData);
+    add_point(type, x3, y3, userData);
 }
 
-static size_t _ok_path_flatten_curve(ok_add_segment_func func, void *userData,
+static size_t _ok_path_flatten_curve(ok_add_point_func add_point, void *userData,
                                      enum ok_path_element_type type,
                                      double x1, double y1, double x2, double y2,
                                      double x3, double y3, double x4, double y4) {
@@ -938,21 +938,21 @@ static size_t _ok_path_flatten_curve(ok_add_segment_func func, void *userData,
     size_t num_segments4 = _ok_num_segments(rx1234, ry1234, rx234, ry234, rx34, ry34, x4, y4);
 
     // Convert to lines
-    if (func) {
-        _ok_path_flatten_curve_division(func, userData, type, num_segments1,
+    if (add_point) {
+        _ok_path_flatten_curve_division(add_point, userData, type, num_segments1,
                                         x1, y1, lx12, ly12, lx123, ly123, lx1234, ly1234);
-        _ok_path_flatten_curve_division(func, userData, type, num_segments2,
+        _ok_path_flatten_curve_division(add_point, userData, type, num_segments2,
                                         lx1234, ly1234, lx234, ly234, lx34, ly34, x1234, y1234);
-        _ok_path_flatten_curve_division(func, userData, type, num_segments3,
+        _ok_path_flatten_curve_division(add_point, userData, type, num_segments3,
                                         x1234, y1234, rx12, ry12, rx123, ry123, rx1234, ry1234);
-        _ok_path_flatten_curve_division(func, userData, type, num_segments4,
+        _ok_path_flatten_curve_division(add_point, userData, type, num_segments4,
                                         rx1234, ry1234, rx234, ry234, rx34, ry34, x4, y4);
     }
     return num_segments1 + num_segments2 + num_segments3 + num_segments4;
 }
 
 static size_t _ok_path_flatten_generic(const ok_path_t *path, size_t first_index, size_t last_index,
-                                       ok_add_segment_func func, void *userData) {
+                                       ok_add_point_func add_point, void *userData) {
     double x = 0.0;
     double y = 0.0;
     size_t count = 0;
@@ -963,16 +963,16 @@ static size_t _ok_path_flatten_generic(const ok_path_t *path, size_t first_index
             double cy1 = (y + element->cy1 * 2.0) / 3.0;
             double cx2 = (element->x + element->cx1 * 2.0) / 3.0;
             double cy2 = (element->y + element->cy1 * 2.0) / 3.0;
-            count += _ok_path_flatten_curve(func, userData, OK_PATH_QUAD_CURVE_TO, x, y,
+            count += _ok_path_flatten_curve(add_point, userData, OK_PATH_QUAD_CURVE_TO, x, y,
                                             cx1, cy1, cx2, cy2, element->x, element->y);
         } else if (element->type == OK_PATH_CUBIC_CURVE_TO) {
-            count += _ok_path_flatten_curve(func, userData, OK_PATH_CUBIC_CURVE_TO, x, y,
+            count += _ok_path_flatten_curve(add_point, userData, OK_PATH_CUBIC_CURVE_TO, x, y,
                                             element->cx1, element->cy1,
                                             element->cx2, element->cy2,
                                             element->x, element->y);
         } else {
-            if (func) {
-                func(element->type, element->x, element->y, userData);
+            if (add_point) {
+                add_point(element->type, element->x, element->y, userData);
             }
             count++;
         }
@@ -982,8 +982,7 @@ static size_t _ok_path_flatten_generic(const ok_path_t *path, size_t first_index
     return count;
 }
 
-static void _ok_path_add_segment(enum ok_path_element_type type, double x, double y,
-                                 void *userData) {
+static void _ok_path_add_point(enum ok_path_element_type type, double x, double y, void *userData) {
     ok_path_t *flattened_path = userData;
     if (type == OK_PATH_MOVE_TO) {
         ok_path_move_to(flattened_path, x, y);
@@ -1003,8 +1002,7 @@ static ok_path_t *_ok_path_flatten(const ok_path_t *path, size_t first_index, si
         ok_path_free(flattened_path);
         return NULL;
     } else {
-        _ok_path_flatten_generic(path, first_index, last_index,
-                                 _ok_path_add_segment, flattened_path);
+        _ok_path_flatten_generic(path, first_index, last_index, _ok_path_add_point, flattened_path);
         return flattened_path;
     }
 }
@@ -1053,8 +1051,8 @@ void ok_motion_path_free(ok_motion_path_t *path) {
     free(path);
 }
 
-static void _ok_motion_path_add_segment(enum ok_path_element_type type, double x, double y,
-                                        void *userData) {
+static void _ok_motion_path_add_point(enum ok_path_element_type type, double x, double y,
+                                      void *userData) {
     ok_motion_path_t *path = userData;
     double dx;
     double dy;
@@ -1093,8 +1091,8 @@ ok_motion_path_t *ok_motion_path_create(const ok_path_t *path) {
         ok_motion_path_free(out_path);
         return NULL;
     } else {
-        _ok_path_flatten_generic(path, first_index, last_index,
-                                 _ok_motion_path_add_segment, out_path);
+        _ok_path_flatten_generic(path, first_index, last_index, _ok_motion_path_add_point,
+                                 out_path);
         return out_path;
     }
 }
