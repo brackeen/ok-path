@@ -1,7 +1,7 @@
 /*
  ok-path
  https://github.com/brackeen/ok-path
- Copyright (c) 2016-2018 David Brackeen
+ Copyright (c) 2016-2020 David Brackeen
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
  associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -1125,27 +1125,11 @@ double ok_motion_path_length(const ok_motion_path_t *path) {
     }
 }
 
-static double _ok_wrap_to_plus_minus_pi(double radians) {
+static double _ok_normalize_angle(double radians) {
     if (radians < -M_PI || radians > M_PI) {
-        // Transform range to (0 to 1)
-        double new_angle = (radians + M_PI) / (2.0 * M_PI);
-        new_angle -= floor(new_angle);
-        // Transform back to (-pi to pi) range
-        return (M_PI * (new_angle * 2.0 - 1.0));
+        return radians - (2.0 * M_PI) * floor((radians + M_PI) / (2.0 * M_PI));
     } else {
         return radians;
-    }
-}
-
-static double _ok_shortest_arc(double from_radians, double to_radians) {
-    const double from_value = _ok_wrap_to_plus_minus_pi(from_radians);
-    const double to_value = _ok_wrap_to_plus_minus_pi(to_radians);
-    const double d1 = to_value - from_value;
-    const double d2 = from_value - to_value + 2.0 * M_PI;
-    if (fabs(d1) < fabs(d2)) {
-        return d1;
-    } else {
-        return d2;
     }
 }
 
@@ -1227,7 +1211,7 @@ void ok_motion_path_location(const ok_motion_path_t *path, double p,
                     } else {
                         const double angle1 = s1->angle_to;
                         const double angle2 = s2->angle_to;
-                        const double d_angle = _ok_shortest_arc(angle1, angle2);
+                        const double d_angle = _ok_normalize_angle(angle2 - angle1);
                         *out_angle = angle1 + d_angle * (p - p1) / (p2 - p1);
                     }
                 }
