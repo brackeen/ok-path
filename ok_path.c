@@ -241,9 +241,9 @@ size_t ok_subpath_count(const ok_path_t *path) {
     return path->subpaths.length;
 }
 
-ok_path_t *ok_subpath_create(const ok_path_t *path, size_t index) {
+ok_path_t *ok_subpath_create(const ok_path_t *path, size_t subpath_index) {
     ok_path_t *new_path = ok_path_create();
-    const struct ok_subpath *subpath = vector_at(&path->subpaths, index);
+    const struct ok_subpath *subpath = vector_at(&path->subpaths, subpath_index);
     size_t count = subpath->last_index - subpath->first_index + 1;
     if (vector_ensure_capacity(&new_path->elements, count)) {
         struct ok_path_element *src_values = path->elements.values + subpath->first_index;
@@ -264,16 +264,21 @@ ok_path_t *ok_subpath_create(const ok_path_t *path, size_t index) {
     return new_path;
 }
 
-size_t ok_subpath_first_element_index(const ok_path_t *path, size_t index) {
-    return vector_at(&path->subpaths, index)->first_index;
+size_t ok_subpath_first_element_index(const ok_path_t *path, size_t subpath_index) {
+    return vector_at(&path->subpaths, subpath_index)->first_index;
 }
 
-size_t ok_subpath_last_element_index(const ok_path_t *path, size_t index) {
-    return vector_at(&path->subpaths, index)->last_index;
+size_t ok_subpath_last_element_index(const ok_path_t *path, size_t subpath_index) {
+    return vector_at(&path->subpaths, subpath_index)->last_index;
 }
 
-bool ok_subpath_is_flat(const ok_path_t *path, size_t index) {
-    return !vector_at(&path->subpaths, index)->has_curves;
+bool ok_subpath_is_flat(const ok_path_t *path, size_t subpath_index) {
+    return !vector_at(&path->subpaths, subpath_index)->has_curves;
+}
+
+bool ok_subpath_is_closed(const ok_path_t *path, size_t subpath_index) {
+    size_t element_index = ok_subpath_last_element_index(path, subpath_index);
+    return vector_at(&path->elements, element_index)->type == OK_PATH_CLOSE;
 }
 
 // MARK: Modifying paths

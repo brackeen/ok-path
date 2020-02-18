@@ -257,42 +257,53 @@ size_t ok_subpath_count(const ok_path_t *path);
  * Creates a copy of a subpath from the path.
  *
  * @param path The path.
- * @param index The subpath index, from `0` to `count-1`, where `count` is the value returned from
- *     #ok_subpath_count.
+ * @param subpath_index The subpath index, from `0` to `count-1`, where `count` is the value
+ *     returned from #ok_subpath_count.
  */
-ok_path_t *ok_subpath_create(const ok_path_t *path, size_t index);
+ok_path_t *ok_subpath_create(const ok_path_t *path, size_t subpath_index);
 
 /**
  * Creates a flattened version of a subpath. All curved segments of the subpath are converted to a
  * series of straight lines that approximates the curve.
  *
  * @param path The path.
- * @param index The subpath index, from `0` to `count-1`, where `count` is the value returned from
- *     #ok_subpath_count.
+ * @param subpath_index The subpath index, from `0` to `count-1`, where `count` is the value
+ *     returned from #ok_subpath_count.
  */
-ok_path_t *ok_subpath_flatten(const ok_path_t *path, size_t index);
+ok_path_t *ok_subpath_flatten(const ok_path_t *path, size_t subpath_index);
 
 /**
  * Gets the index of the first element of the specified subpath in the path.
  * @param path The path.
- * @param index The subpath index, from `0` to `count-1`, where `count` is the value returned from
- *     #ok_subpath_count.
+ * @param subpath_index The subpath index, from `0` to `count-1`, where `count` is the value
+ *     returned from #ok_subpath_count.
  */
-size_t ok_subpath_first_element_index(const ok_path_t *path, size_t index);
+size_t ok_subpath_first_element_index(const ok_path_t *path, size_t subpath_index);
 
 /**
  * Gets the index of the last element of the specified subpath in the path.
  * @param path The path.
- * @param index The subpath index, from `0` to `count-1`, where `count` is the value returned from
- *     #ok_subpath_count.
+ * @param subpath_index The subpath index, from `0` to `count-1`, where `count` is the value
+ *     returned from #ok_subpath_count.
  */
-size_t ok_subpath_last_element_index(const ok_path_t *path, size_t index);
+size_t ok_subpath_last_element_index(const ok_path_t *path, size_t subpath_index);
 
 /**
  * Checks if a subpath is flat (consists of only #OK_PATH_MOVE_TO, #OK_PATH_LINE_TO, and
  * #OK_PATH_CLOSE elements).
+ * @param path The path.
+ * @param subpath_index The subpath index, from `0` to `count-1`, where `count` is the value
+ *     returned from #ok_subpath_count.
  */
-bool ok_subpath_is_flat(const ok_path_t *path, size_t index);
+bool ok_subpath_is_flat(const ok_path_t *path, size_t subpath_index);
+
+/**
+* Checks if a subpath is closed (the last element is of type #OK_PATH_CLOSE).
+* @param path The path.
+* @param subpath_index The subpath index, from `0` to `count-1`, where `count` is the value
+*     returned from #ok_subpath_count.
+*/
+bool ok_subpath_is_closed(const ok_path_t *path, size_t subpath_index);
 
 // MARK: Motion paths
 
