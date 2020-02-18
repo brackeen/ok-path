@@ -1,7 +1,7 @@
 /*
  ok-path
  https://github.com/brackeen/ok-path
- Copyright (c) 2016-2018 David Brackeen
+ Copyright (c) 2016-2020 David Brackeen
 
  Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
  associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -54,7 +54,7 @@ typedef struct ok_motion_path ok_motion_path_t;
 ok_path_t *ok_path_create(void);
 
 /**
- * Frees an #ok_path_t.
+ * Frees an #ok_path_t. If the path is NULL, this function does nothing.
  */
 void ok_path_free(ok_path_t *path);
 

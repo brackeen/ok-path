@@ -108,9 +108,11 @@ ok_path_t *ok_path_create() {
 }
 
 void ok_path_free(ok_path_t *path) {
-    vector_free(&path->elements);
-    vector_free(&path->subpaths);
-    free(path);
+    if (path) {
+        vector_free(&path->elements);
+        vector_free(&path->subpaths);
+        free(path);
+    }
 }
 
 void ok_path_reset(ok_path_t *path) {
