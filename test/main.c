@@ -282,7 +282,7 @@ static int test_pslg() {
     size_t *segments = NULL;
     size_t num_points = 0;
     size_t num_segments = 0;
-    ok_path_create_pslg(path1, &points, &num_points, &segments, &num_segments);
+    ok_path_create_pslg(path1, false, &points, &num_points, &segments, &num_segments);
     ok_path_append_pslg(path2, points, segments, num_segments);
     free(points);
     free(segments);

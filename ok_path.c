@@ -969,43 +969,57 @@ static size_t _ok_path_flatten_curve(ok_add_point_func add_point, void *userData
     return num_segments1 + num_segments2 + num_segments3 + num_segments4;
 }
 
-static size_t _ok_path_flatten_generic(const ok_path_t *path, size_t first_index, size_t last_index,
+static size_t _ok_path_flatten_generic(const ok_path_t *path, size_t first_subpath,
+                                       size_t last_subpath, bool close_subpaths,
                                        ok_add_point_func add_point, void *userData) {
-    if (ok_path_is_flat(path)) {
-        if (add_point) {
+    size_t count = 0;
+    for (size_t subpath_index = first_subpath; subpath_index <= last_subpath; subpath_index++) {
+        size_t first_index = ok_subpath_first_element_index(path, subpath_index);
+        size_t last_index = ok_subpath_last_element_index(path, subpath_index);
+
+        if (ok_subpath_is_flat(path, subpath_index)) {
+            if (add_point) {
+                for (size_t i = first_index; i <= last_index; i++) {
+                    struct ok_path_element *element = &path->elements.values[i];
+                    add_point(element->type, element->x, element->y, userData);
+                }
+            }
+            count += last_index - first_index + 1;
+        } else {
+            double x = 0.0;
+            double y = 0.0;
+            
             for (size_t i = first_index; i <= last_index; i++) {
                 struct ok_path_element *element = &path->elements.values[i];
-                add_point(element->type, element->x, element->y, userData);
+                if (element->type == OK_PATH_QUAD_CURVE_TO) {
+                    double cx1 = (x + element->cx1 * 2.0) / 3.0;
+                    double cy1 = (y + element->cy1 * 2.0) / 3.0;
+                    double cx2 = (element->x + element->cx1 * 2.0) / 3.0;
+                    double cy2 = (element->y + element->cy1 * 2.0) / 3.0;
+                    count += _ok_path_flatten_curve(add_point, userData, OK_PATH_QUAD_CURVE_TO, x, y,
+                                                    cx1, cy1, cx2, cy2, element->x, element->y);
+                } else if (element->type == OK_PATH_CUBIC_CURVE_TO) {
+                    count += _ok_path_flatten_curve(add_point, userData, OK_PATH_CUBIC_CURVE_TO, x, y,
+                                                    element->cx1, element->cy1,
+                                                    element->cx2, element->cy2,
+                                                    element->x, element->y);
+                } else {
+                    if (add_point) {
+                        add_point(element->type, element->x, element->y, userData);
+                    }
+                    count++;
+                }
+                x = element->x;
+                y = element->y;
             }
         }
-        return last_index - first_index + 1;
-    }
-    
-    double x = 0.0;
-    double y = 0.0;
-    size_t count = 0;
-    for (size_t i = first_index; i <= last_index; i++) {
-        struct ok_path_element *element = &path->elements.values[i];
-        if (element->type == OK_PATH_QUAD_CURVE_TO) {
-            double cx1 = (x + element->cx1 * 2.0) / 3.0;
-            double cy1 = (y + element->cy1 * 2.0) / 3.0;
-            double cx2 = (element->x + element->cx1 * 2.0) / 3.0;
-            double cy2 = (element->y + element->cy1 * 2.0) / 3.0;
-            count += _ok_path_flatten_curve(add_point, userData, OK_PATH_QUAD_CURVE_TO, x, y,
-                                            cx1, cy1, cx2, cy2, element->x, element->y);
-        } else if (element->type == OK_PATH_CUBIC_CURVE_TO) {
-            count += _ok_path_flatten_curve(add_point, userData, OK_PATH_CUBIC_CURVE_TO, x, y,
-                                            element->cx1, element->cy1,
-                                            element->cx2, element->cy2,
-                                            element->x, element->y);
-        } else {
+        if (close_subpaths && !ok_subpath_is_closed(path, subpath_index)) {
             if (add_point) {
-                add_point(element->type, element->x, element->y, userData);
+                struct ok_path_element *element = &path->elements.values[first_index];
+                add_point(OK_PATH_CLOSE, element->x, element->y, userData);
             }
             count++;
         }
-        x = element->x;
-        y = element->y;
     }
     return count;
 }
@@ -1023,21 +1037,24 @@ static void _ok_path_add_point(enum ok_path_element_type type, double x, double 
     }
 }
 
-static ok_path_t *_ok_path_flatten(const ok_path_t *path, size_t first_index, size_t last_index) {
-    size_t count = _ok_path_flatten_generic(path, first_index, last_index, NULL, NULL);
+static ok_path_t *_ok_path_flatten(const ok_path_t *path, size_t first_subpath,
+                                   size_t last_subpath, bool close_subpaths) {
+    size_t count = _ok_path_flatten_generic(path, first_subpath, last_subpath, close_subpaths,
+                                            NULL, NULL);
     ok_path_t *flattened_path = ok_path_create();
     if (!vector_ensure_capacity(&flattened_path->elements, count)) {
         ok_path_free(flattened_path);
         return NULL;
     } else {
-        _ok_path_flatten_generic(path, first_index, last_index, _ok_path_add_point, flattened_path);
+        _ok_path_flatten_generic(path, first_subpath, last_subpath, close_subpaths,
+                                 _ok_path_add_point, flattened_path);
         return flattened_path;
     }
 }
 
 ok_path_t *ok_path_flatten(const ok_path_t *path) {
     if (path->has_curves) {
-        return _ok_path_flatten(path, 0, path->elements.length - 1);
+        return _ok_path_flatten(path, 0, path->subpaths.length - 1, false);
     } else {
         ok_path_t *new_path = ok_path_create();
         ok_path_append(new_path, path);
@@ -1045,12 +1062,12 @@ ok_path_t *ok_path_flatten(const ok_path_t *path) {
     }
 }
 
-ok_path_t *ok_subpath_flatten(const ok_path_t *path, size_t index) {
-    const struct ok_subpath *subpath = vector_at(&path->subpaths, index);
+ok_path_t *ok_subpath_flatten(const ok_path_t *path, size_t subpath_index) {
+    const struct ok_subpath *subpath = vector_at(&path->subpaths, subpath_index);
     if (subpath->has_curves) {
-        return _ok_path_flatten(path, subpath->first_index, subpath->last_index);
+        return _ok_path_flatten(path, subpath_index, subpath_index, false);
     } else {
-        return ok_subpath_create(path, index);
+        return ok_subpath_create(path, subpath_index);
     }
 }
 
@@ -1111,16 +1128,16 @@ static void _ok_motion_path_add_point(enum ok_path_element_type type, double x, 
 }
 
 ok_motion_path_t *ok_motion_path_create(const ok_path_t *path) {
-    size_t first_index = 0;
-    size_t last_index = path->elements.length - 1;
-    size_t count = _ok_path_flatten_generic(path, first_index, last_index, NULL, NULL);
+    size_t first_subpath = 0;
+    size_t last_subpath = path->subpaths.length - 1;
+    size_t count = _ok_path_flatten_generic(path, first_subpath, last_subpath, false, NULL, NULL);
     ok_motion_path_t *out_path = calloc(1, sizeof(ok_motion_path_t));
     if (!vector_ensure_capacity(&out_path->segments, count)) {
         ok_motion_path_free(out_path);
         return NULL;
     } else {
-        _ok_path_flatten_generic(path, first_index, last_index, _ok_motion_path_add_point,
-                                 out_path);
+        _ok_path_flatten_generic(path, first_subpath, last_subpath, false,
+                                 _ok_motion_path_add_point, out_path);
         return out_path;
     }
 }
@@ -1301,9 +1318,9 @@ static void _ok_pslg_add_point(enum ok_path_element_type type, double x, double 
     }
 }
 
-void ok_path_create_pslg_generic(const ok_path_t *path, size_t index_size, float **out_points,
-                                 size_t *out_num_points, void **out_segment_indices,
-                                 size_t *out_num_segments) {
+void ok_path_create_pslg_generic(const ok_path_t *path, bool close_subpaths, size_t index_size,
+                                 float **out_points, size_t *out_num_points,
+                                 void **out_segment_indices, size_t *out_num_segments) {
     // Validate input
     if (!_ok_index_size_valid(index_size) || path->elements.length == 0) {
         *out_points = NULL;
@@ -1313,8 +1330,8 @@ void ok_path_create_pslg_generic(const ok_path_t *path, size_t index_size, float
         return;
     }
 
-    size_t first_index = 0;
-    size_t last_index = path->elements.length - 1;
+    size_t first_subpath = 0;
+    size_t last_subpath = path->subpaths.length - 1;
 
     // Initialize context
     struct ok_pslg_context context;
@@ -1323,8 +1340,9 @@ void ok_path_create_pslg_generic(const ok_path_t *path, size_t index_size, float
     context.segments = NULL;
     context.num_points = 0;
     context.num_segments = 0;
-    context.max_points = _ok_path_flatten_generic(path, first_index, last_index, NULL, NULL);
-    context.max_segments = MIN((context.max_points - 1), (1 << (index_size * 8 - 1)));
+    context.max_points = _ok_path_flatten_generic(path, first_subpath, last_subpath, close_subpaths,
+                                                  NULL, NULL);
+    context.max_segments = MIN((context.max_points - 1), (((size_t)1) << (index_size * 8 - 1)));
 
     // Allocate
     context.points = malloc(context.max_points * sizeof(float[2]));
@@ -1340,7 +1358,8 @@ void ok_path_create_pslg_generic(const ok_path_t *path, size_t index_size, float
     }
 
     // Convert
-    _ok_path_flatten_generic(path, first_index, last_index, _ok_pslg_add_point, &context);
+    _ok_path_flatten_generic(path, first_subpath, last_subpath, close_subpaths,
+                             _ok_pslg_add_point, &context);
     *out_points = context.points;
     *out_num_points = context.num_points;
     *out_segment_indices = context.segments;

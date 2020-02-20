@@ -348,6 +348,7 @@ void ok_motion_path_location(const ok_motion_path_t *path, double p,
  * This function is the same as #ok_path_to_pslg but using a generic size for segment indices.
  *
  * @param path The path.
+ * @param close_subpaths If true, an additional segment is added to close all subpaths.
  * @param index_size The size, in bytes, of the point indices. The value `sizeof(uint16_t)` will
  *     allow up to 65536 points. On 32-bit targets, this value must be 1, 2, or 4. On 64-bit
  *     targets, this value must be 1, 2, 4, or 8.
@@ -360,9 +361,9 @@ void ok_motion_path_location(const ok_motion_path_t *path, double p,
  *     should be freed by the caller.
  * @param[out] out_num_segments The number of segments returned.
  */
-void ok_path_create_pslg_generic(const ok_path_t *path, size_t index_size, float **out_points,
-                                 size_t *out_num_points, void **out_segment_indices,
-                                 size_t *out_num_segments);
+void ok_path_create_pslg_generic(const ok_path_t *path, bool close_subpaths, size_t index_size,
+                                 float **out_points, size_t *out_num_points,
+                                 void **out_segment_indices, size_t *out_num_segments);
 
 /**
  * Converts a path to a planar straight-line graph, flattening if needed.
@@ -374,6 +375,7 @@ void ok_path_create_pslg_generic(const ok_path_t *path, size_t index_size, float
  * This function is the same as #ok_path_to_pslg_generic using segment indices of type `size_t`.
  *
  * @param path The path.
+ * @param close_subpaths If true, an additional segment is added to close all subpaths.
  * @param[out] out_points The location to return a newly allocated array of points. The length of
  *     the array will be `out_num_points * sizeof(float[2])`. The array should be freed by the
  *     caller.
@@ -383,10 +385,11 @@ void ok_path_create_pslg_generic(const ok_path_t *path, size_t index_size, float
  *     by the caller.
  * @param[out] out_num_segments The number of segments returned.
  */
-static inline void ok_path_create_pslg(const ok_path_t *path,
+static inline void ok_path_create_pslg(const ok_path_t *path, bool close_subpaths,
                                        float **out_points, size_t *out_num_points,
                                        size_t **out_segment_indices, size_t *out_num_segments) {
-    ok_path_create_pslg_generic(path, sizeof(**out_segment_indices), out_points, out_num_points,
+    ok_path_create_pslg_generic(path, close_subpaths, sizeof(**out_segment_indices),
+                                out_points, out_num_points,
                                 (void **)out_segment_indices, out_num_segments);
 }
 
