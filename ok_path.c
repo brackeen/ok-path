@@ -252,6 +252,7 @@ ok_path_t *ok_subpath_create(const ok_path_t *path, size_t subpath_index) {
         new_path->elements.length += count;
         new_path->subpath_origin_x = src_values[0].x;
         new_path->subpath_origin_y = src_values[0].y;
+        new_path->has_curves = subpath->has_curves;
 
         struct ok_subpath *new_subpath = vector_push_new(&new_path->subpaths);
         new_subpath->first_index = 0;
