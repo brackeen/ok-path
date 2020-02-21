@@ -1092,8 +1092,10 @@ struct ok_motion_path {
 };
 
 void ok_motion_path_free(ok_motion_path_t *path) {
-    vector_free(&path->segments);
-    free(path);
+    if (path) {
+        vector_free(&path->segments);
+        free(path);
+    }
 }
 
 static void _ok_motion_path_add_point(enum ok_path_element_type type, double x, double y,
