@@ -58,6 +58,18 @@ ok_path_t *ok_path_create(void);
  */
 void ok_path_free(ok_path_t *path);
 
+/**
+ * Gets the flatness value used when flattening curves of the path.
+ * A larger flatness value results in fewer segments with flattening curves or creating a motion path. The default is 1.0.
+ */
+double ok_path_get_flatness(const ok_path_t *path);
+
+/**
+ * Sets the flatness value used when flattening curves of the path.
+ * A larger flatness value results in fewer segments with flattening curves or creating a motion path.
+ */
+void ok_path_set_flatness(ok_path_t *path, double flatness);
+
 // MARK: Modifying paths
 
 /**

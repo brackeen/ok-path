@@ -75,6 +75,8 @@ static bool vector_realloc(void **values, size_t min_capacity, size_t element_si
 
 // MARK: Path
 
+static const double OK_PATH_DEFAULT_FLATNESS = 1.0;
+
 #define ok_path_type_is_curve(type) ((type) == OK_PATH_QUAD_CURVE_TO || \
                                      (type) == OK_PATH_CUBIC_CURVE_TO)
 
@@ -101,10 +103,17 @@ struct ok_path {
     double subpath_origin_x;
     double subpath_origin_y;
     bool has_curves;
+    double flatness;
 };
 
+static ok_path_t *ok_path_create_with_flatness(double flatness) {
+    ok_path_t *path = calloc(1, sizeof(ok_path_t));
+    path->flatness = flatness;
+    return path;
+}
+
 ok_path_t *ok_path_create() {
-    return calloc(1, sizeof(ok_path_t));
+    return ok_path_create_with_flatness(OK_PATH_DEFAULT_FLATNESS);
 }
 
 void ok_path_free(ok_path_t *path) {
@@ -113,6 +122,14 @@ void ok_path_free(ok_path_t *path) {
         vector_free(&path->subpaths);
         free(path);
     }
+}
+
+double ok_path_get_flatness(const ok_path_t *path) {
+    return path->flatness;
+}
+
+void ok_path_set_flatness(ok_path_t *path, double flatness) {
+    path->flatness = MAX(0.01, flatness);
 }
 
 void ok_path_reset(ok_path_t *path) {
@@ -242,7 +259,7 @@ size_t ok_subpath_count(const ok_path_t *path) {
 }
 
 ok_path_t *ok_subpath_create(const ok_path_t *path, size_t subpath_index) {
-    ok_path_t *new_path = ok_path_create();
+    ok_path_t *new_path = ok_path_create_with_flatness(path->flatness);
     const struct ok_subpath *subpath = vector_at(&path->subpaths, subpath_index);
     size_t count = subpath->last_index - subpath->first_index + 1;
     if (vector_ensure_capacity(&new_path->elements, count)) {
@@ -833,32 +850,24 @@ static double _ok_approx_dist(double px, double py, double ax, double ay,
     return fabs(a2) / div;
 }
 
-static int _ok_ilog2(int n) {
-    int count = 0;
-    while (true) {
-        n >>= 1;
-        if (n == 0) {
-            return count;
-        }
-        count++;
-    }
-}
-
-static size_t _ok_num_segments(double x0, double y0, double x1, double y1,
+static size_t _ok_num_segments(double flatness,
+                               double x0, double y0, double x1, double y1,
                                double x2, double y2, double x3, double y3) {
-    size_t num_segments;
-
     double dist = fmax(_ok_approx_dist(x1, y1, x0, y0, x3, y3),
                        _ok_approx_dist(x2, y2, x0, y0, x3, y3));
-
     if (dist <= 0) {
-        num_segments = 1;
+        return 1;
     } else {
-        num_segments = MAX(1, 1 << (_ok_ilog2((int)lround(dist * 1.5))));
-        num_segments = MIN(num_segments, 16); // XXX: Max of 16 segments? Why?
+        // Found by trial and error when attempting to match Apple's Core Graphics.
+        double num_segments = ceil(dist * (5 / (flatness + 1)));
+        if (num_segments <= 1) {
+            return 1;
+        } else if (num_segments >= 256) {
+            return 256; // XXX: Max of 256 segments? Why?
+        } else {
+            return (size_t)num_segments;
+        }
     }
-
-    return num_segments;
 }
 
 static void _ok_path_flatten_curve_division(ok_add_point_func add_point, void *userData,
@@ -903,7 +912,8 @@ static void _ok_path_flatten_curve_division(ok_add_point_func add_point, void *u
     add_point(type, x3, y3, userData);
 }
 
-static size_t _ok_path_flatten_curve(ok_add_point_func add_point, void *userData,
+static size_t _ok_path_flatten_curve(double flatness,
+                                     ok_add_point_func add_point, void *userData,
                                      enum ok_path_element_type type,
                                      double x1, double y1, double x2, double y2,
                                      double x3, double y3, double x4, double y4) {
@@ -950,10 +960,10 @@ static size_t _ok_path_flatten_curve(ok_add_point_func add_point, void *userData
     const double ry1234 = (ry123 + ry234) / 2;
 
     // Determine the number of segments for each division
-    size_t num_segments1 = _ok_num_segments(x1, y1, lx12, ly12, lx123, ly123, lx1234, ly1234);
-    size_t num_segments2 = _ok_num_segments(lx1234, ly1234, lx234, ly234, lx34, ly34, x1234, y1234);
-    size_t num_segments3 = _ok_num_segments(x1234, y1234, rx12, ry12, rx123, ry123, rx1234, ry1234);
-    size_t num_segments4 = _ok_num_segments(rx1234, ry1234, rx234, ry234, rx34, ry34, x4, y4);
+    size_t num_segments1 = _ok_num_segments(flatness, x1, y1, lx12, ly12, lx123, ly123, lx1234, ly1234);
+    size_t num_segments2 = _ok_num_segments(flatness, lx1234, ly1234, lx234, ly234, lx34, ly34, x1234, y1234);
+    size_t num_segments3 = _ok_num_segments(flatness, x1234, y1234, rx12, ry12, rx123, ry123, rx1234, ry1234);
+    size_t num_segments4 = _ok_num_segments(flatness, rx1234, ry1234, rx234, ry234, rx34, ry34, x4, y4);
 
     // Convert to lines
     if (add_point) {
@@ -996,10 +1006,12 @@ static size_t _ok_path_flatten_generic(const ok_path_t *path, size_t first_subpa
                     double cy1 = (y + element->cy1 * 2.0) / 3.0;
                     double cx2 = (element->x + element->cx1 * 2.0) / 3.0;
                     double cy2 = (element->y + element->cy1 * 2.0) / 3.0;
-                    count += _ok_path_flatten_curve(add_point, userData, OK_PATH_QUAD_CURVE_TO, x, y,
+                    count += _ok_path_flatten_curve(path->flatness, add_point, userData,
+                                                    OK_PATH_QUAD_CURVE_TO, x, y,
                                                     cx1, cy1, cx2, cy2, element->x, element->y);
                 } else if (element->type == OK_PATH_CUBIC_CURVE_TO) {
-                    count += _ok_path_flatten_curve(add_point, userData, OK_PATH_CUBIC_CURVE_TO, x, y,
+                    count += _ok_path_flatten_curve(path->flatness, add_point, userData,
+                                                    OK_PATH_CUBIC_CURVE_TO, x, y,
                                                     element->cx1, element->cy1,
                                                     element->cx2, element->cy2,
                                                     element->x, element->y);
@@ -1041,7 +1053,7 @@ static ok_path_t *_ok_path_flatten(const ok_path_t *path, size_t first_subpath,
                                    size_t last_subpath, bool close_subpaths) {
     size_t count = _ok_path_flatten_generic(path, first_subpath, last_subpath, close_subpaths,
                                             NULL, NULL);
-    ok_path_t *flattened_path = ok_path_create();
+    ok_path_t *flattened_path = ok_path_create_with_flatness(path->flatness);
     if (!vector_ensure_capacity(&flattened_path->elements, count)) {
         ok_path_free(flattened_path);
         return NULL;
@@ -1056,7 +1068,7 @@ ok_path_t *ok_path_flatten(const ok_path_t *path) {
     if (path->has_curves) {
         return _ok_path_flatten(path, 0, path->subpaths.length - 1, false);
     } else {
-        ok_path_t *new_path = ok_path_create();
+        ok_path_t *new_path = ok_path_create_with_flatness(path->flatness);
         ok_path_append(new_path, path);
         return new_path;
     }
