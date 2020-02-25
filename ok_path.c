@@ -828,6 +828,32 @@ bool ok_path_append_svg(ok_path_t *path, const char *svg_path, char **out_error_
     return (str != NULL);
 }
 
+// MARK: Transforms
+
+void ok_path_scale(ok_path_t *path, double scale_x, double scale_y) {
+    for (size_t i = 0; i < ok_path_element_count(path); i++) {
+        struct ok_path_element *element = path->elements.values + i;
+        element->x *= scale_x;
+        element->y *= scale_y;
+        element->cx1 *= scale_x;
+        element->cy1 *= scale_y;
+        element->cx2 *= scale_x;
+        element->cy2 *= scale_y;
+    }
+}
+
+void ok_path_translate(ok_path_t *path, double translate_x, double translate_y) {
+    for (size_t i = 0; i < ok_path_element_count(path); i++) {
+        struct ok_path_element *element = path->elements.values + i;
+        element->x += translate_x;
+        element->y += translate_y;
+        element->cx1 += translate_x;
+        element->cy1 += translate_y;
+        element->cx2 += translate_x;
+        element->cy2 += translate_y;
+    }
+}
+
 // MARK: Path flattening
 
 typedef void (*ok_add_point_func)(enum ok_path_element_type type, double x, double y,

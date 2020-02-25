@@ -197,6 +197,18 @@ void ok_path_reset(ok_path_t *path);
  */
 ok_path_t *ok_path_flatten(const ok_path_t *path);
 
+// MARK: Transforms
+
+/**
+ * Scales a path. The path is scaled with (0,0) as the center.
+ */
+void ok_path_scale(ok_path_t *path, double scale_x, double scale_y);
+
+/**
+ * Translates a path.
+ */
+void ok_path_translate(ok_path_t *path, double translate_x, double translate_y);
+
 // MARK: Getting information about paths
 
 /**
