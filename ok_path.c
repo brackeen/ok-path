@@ -92,6 +92,8 @@ struct ok_path_element {
 struct ok_subpath {
     size_t first_index;
     size_t last_index;
+    double origin_x;
+    double origin_y;
     bool has_curves;
 };
 
@@ -100,8 +102,6 @@ struct vector_of_path_elements vector_of(struct ok_path_element);
 struct ok_path {
     struct vector_of_path_elements elements;
     struct vector_of(struct ok_subpath) subpaths;
-    double subpath_origin_x;
-    double subpath_origin_y;
     bool has_curves;
     double flatness;
 };
@@ -135,8 +135,6 @@ void ok_path_set_flatness(ok_path_t *path, double flatness) {
 void ok_path_reset(ok_path_t *path) {
     path->elements.length = 0;
     path->subpaths.length = 0;
-    path->subpath_origin_x = 0.0;
-    path->subpath_origin_y = 0.0;
     path->has_curves = false;
 }
 
@@ -267,13 +265,13 @@ ok_path_t *ok_subpath_create(const ok_path_t *path, size_t subpath_index) {
         struct ok_path_element *dst_values = new_path->elements.values;
         memcpy(dst_values, src_values, count * sizeof(struct ok_path_element));
         new_path->elements.length += count;
-        new_path->subpath_origin_x = src_values[0].x;
-        new_path->subpath_origin_y = src_values[0].y;
         new_path->has_curves = subpath->has_curves;
 
         struct ok_subpath *new_subpath = vector_push_new(&new_path->subpaths);
         new_subpath->first_index = 0;
         new_subpath->last_index = count - 1;
+        new_subpath->origin_x = subpath->origin_x;
+        new_subpath->origin_y = subpath->origin_y;
         new_subpath->has_curves = subpath->has_curves;
     } else {
         ok_path_free(new_path);
@@ -290,6 +288,11 @@ size_t ok_subpath_last_element_index(const ok_path_t *path, size_t subpath_index
     return vector_at(&path->subpaths, subpath_index)->last_index;
 }
 
+void ok_subpath_origin(const ok_path_t *path, size_t subpath_index, double *out_x, double *out_y) {
+    *out_x = vector_at(&path->subpaths, subpath_index)->origin_x;
+    *out_y = vector_at(&path->subpaths, subpath_index)->origin_y;
+}
+
 bool ok_subpath_is_flat(const ok_path_t *path, size_t subpath_index) {
     return !vector_at(&path->subpaths, subpath_index)->has_curves;
 }
@@ -302,66 +305,57 @@ bool ok_subpath_is_closed(const ok_path_t *path, size_t subpath_index) {
 // MARK: Modifying paths
 
 static struct ok_path_element * _ok_path_new_element(ok_path_t *path,
-                                                     enum ok_path_element_type type) {
-    struct ok_path_element *element;
+                                                     enum ok_path_element_type type,
+                                                     double x, double y) {
+    // New subpath if current is MOVE, previous is CLOSE, or this is the first element
     if (type == OK_PATH_MOVE_TO) {
-        element = vector_push_new(&path->elements);
-        element->type = type;
-    } else {
-        // New subpath if previous is MOVE, previous is CLOSE, or this is the first element
-        bool new_subpath = false;
-        size_t new_subpath_index = 0;
-        if (path->elements.length == 0 || vector_last(&path->elements)->type == OK_PATH_CLOSE) {
-            new_subpath = true;
-            new_subpath_index = path->elements.length;
-        } else if (path->elements.length > 0 &&
-                   vector_last(&path->elements)->type == OK_PATH_MOVE_TO) {
-            new_subpath = true;
-            new_subpath_index = path->elements.length - 1;
-        }
-        if (new_subpath) {
-            struct ok_subpath *subpath = vector_push_new(&path->subpaths);
-            subpath->first_index = new_subpath_index;
-            subpath->has_curves = false;
-        }
-        element = vector_push_new(&path->elements);
-        element->type = type;
-        vector_last(&path->subpaths)->last_index = path->elements.length - 1;
-        if (ok_path_type_is_curve(type)) {
-            path->has_curves = true;
-            vector_last(&path->subpaths)->has_curves = true;
-        }
+        struct ok_subpath *subpath = vector_push_new(&path->subpaths);
+        subpath->first_index = path->elements.length;
+        subpath->has_curves = false;
+        subpath->origin_x = x;
+        subpath->origin_y = y;
+    } else if (path->elements.length == 0) {
+        struct ok_subpath *subpath = vector_push_new(&path->subpaths);
+        subpath->first_index = 0;
+        subpath->has_curves = false;
+        subpath->origin_x = 0.0;
+        subpath->origin_y = 0.0;
+    } else if (vector_last(&path->elements)->type == OK_PATH_CLOSE) {
+        struct ok_subpath *subpath = vector_push_new(&path->subpaths);
+        subpath->first_index = path->elements.length;
+        subpath->has_curves = false;
+        subpath->origin_x = vector_last(&path->elements)->x;
+        subpath->origin_y = vector_last(&path->elements)->y;
+    }
+    struct ok_path_element *element = vector_push_new(&path->elements);
+    element->type = type;
+    element->x = x;
+    element->y = y;
+    vector_last(&path->subpaths)->last_index = path->elements.length - 1;
+    if (ok_path_type_is_curve(type)) {
+        path->has_curves = true;
+        vector_last(&path->subpaths)->has_curves = true;
     }
     return element;
 }
 
 void ok_path_move_to(ok_path_t *path, double x, double y) {
-    struct ok_path_element *element = _ok_path_new_element(path, OK_PATH_MOVE_TO);
-    element->x = x;
-    element->y = y;
-    path->subpath_origin_x = x;
-    path->subpath_origin_y = y;
+    _ok_path_new_element(path, OK_PATH_MOVE_TO, x, y);
 }
 
 void ok_path_line_to(ok_path_t *path, double x, double y) {
-    struct ok_path_element *element = _ok_path_new_element(path, OK_PATH_LINE_TO);
-    element->x = x;
-    element->y = y;
+    _ok_path_new_element(path, OK_PATH_LINE_TO, x, y);
 }
 
 void ok_path_quad_curve_to(ok_path_t *path, double cx, double cy, double x, double y) {
-    struct ok_path_element *element = _ok_path_new_element(path, OK_PATH_QUAD_CURVE_TO);
-    element->x = x;
-    element->y = y;
+    struct ok_path_element *element = _ok_path_new_element(path, OK_PATH_QUAD_CURVE_TO, x, y);
     element->cx1 = cx;
     element->cy1 = cy;
 }
 
 void ok_path_curve_to(ok_path_t *path, double cx1, double cy1, double cx2, double cy2,
                       double x, double y) {
-    struct ok_path_element *element = _ok_path_new_element(path, OK_PATH_CUBIC_CURVE_TO);
-    element->x = x;
-    element->y = y;
+    struct ok_path_element *element = _ok_path_new_element(path, OK_PATH_CUBIC_CURVE_TO, x, y);
     element->cx1 = cx1;
     element->cy1 = cy1;
     element->cx2 = cx2;
@@ -369,9 +363,15 @@ void ok_path_curve_to(ok_path_t *path, double cx1, double cy1, double cx2, doubl
 }
 
 void ok_path_close(ok_path_t *path) {
-    struct ok_path_element *element = _ok_path_new_element(path, OK_PATH_CLOSE);
-    element->x = path->subpath_origin_x;
-    element->y = path->subpath_origin_y;
+    double x, y;
+    if (path->subpaths.length == 0) {
+        x = 0.0;
+        y = 0.0;
+    } else {
+        x = vector_last(&path->subpaths)->origin_x;
+        y = vector_last(&path->subpaths)->origin_y;
+    }
+    _ok_path_new_element(path, OK_PATH_CLOSE, x, y);
 }
 
 void ok_path_append(ok_path_t *path, const ok_path_t *path_to_append) {
@@ -653,9 +653,9 @@ bool ok_path_append_svg(ok_path_t *path, const char *svg_path, char **out_error_
             switch (command) {
                 case 'Z':
                 case 'z': {
-                    curr_x = path->subpath_origin_x;
-                    curr_y = path->subpath_origin_y;
                     ok_path_close(path);
+                    curr_x = vector_last(&path->subpaths)->origin_x;
+                    curr_y = vector_last(&path->subpaths)->origin_y;
                     break;
                 }
                 case 'M': {
@@ -831,6 +831,11 @@ bool ok_path_append_svg(ok_path_t *path, const char *svg_path, char **out_error_
 // MARK: Transforms
 
 void ok_path_scale(ok_path_t *path, double scale_x, double scale_y) {
+    for (size_t i = 0; i < ok_subpath_count(path); i++) {
+        struct ok_subpath *subpath = path->subpaths.values + i;
+        subpath->origin_x *= scale_x;
+        subpath->origin_y *= scale_y;
+    }
     for (size_t i = 0; i < ok_path_element_count(path); i++) {
         struct ok_path_element *element = path->elements.values + i;
         element->x *= scale_x;
@@ -843,6 +848,11 @@ void ok_path_scale(ok_path_t *path, double scale_x, double scale_y) {
 }
 
 void ok_path_translate(ok_path_t *path, double translate_x, double translate_y) {
+    for (size_t i = 0; i < ok_subpath_count(path); i++) {
+        struct ok_subpath *subpath = path->subpaths.values + i;
+        subpath->origin_x += translate_x;
+        subpath->origin_y += translate_y;
+    }
     for (size_t i = 0; i < ok_path_element_count(path); i++) {
         struct ok_path_element *element = path->elements.values + i;
         element->x += translate_x;
@@ -1067,8 +1077,6 @@ static void _ok_path_add_point(enum ok_path_element_type type, double x, double 
     if (type == OK_PATH_MOVE_TO) {
         ok_path_move_to(flattened_path, x, y);
     } else if (type == OK_PATH_CLOSE) {
-        flattened_path->subpath_origin_x = x;
-        flattened_path->subpath_origin_y = y;
         ok_path_close(flattened_path);
     } else {
         ok_path_line_to(flattened_path, x, y);

@@ -316,6 +316,17 @@ size_t ok_subpath_first_element_index(const ok_path_t *path, size_t subpath_inde
 size_t ok_subpath_last_element_index(const ok_path_t *path, size_t subpath_index);
 
 /**
+ * Gets the origin of a subpath. If the first element of the subpath is a #OK_PATH_MOVE_TO command, the origin is the
+ * same. Otherwise, the origin may be the last point of the previous subpath or (0, 0).
+ * @param path The path.
+ * @param subpath_index The subpath index, from `0` to `count-1`, where `count` is the value
+ *     returned from #ok_subpath_count.
+ * @param[out] out_x The pointer where the x location should be stored.
+ * @param[out] out_y The pointer where the y location should be stored.
+ */
+void ok_subpath_origin(const ok_path_t *path, size_t subpath_index, double *out_x, double *out_y);
+
+/**
  * Checks if a subpath is flat (consists of only #OK_PATH_MOVE_TO, #OK_PATH_LINE_TO, and
  * #OK_PATH_CLOSE elements).
  * @param path The path.
