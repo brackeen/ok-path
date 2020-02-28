@@ -274,6 +274,9 @@ void ok_path_element_set(const ok_path_t *path, size_t index,
 
 /**
  * Gets the number of subpaths in a path.
+ *
+ * Subpaths have at least one element. Subpaths may have no more than one #OK_PATH_MOVE_TO command (always
+ * as the first elemeent) and no more than one #OK_PATH_CLOSE command (always as the last element).
  */
 size_t ok_subpath_count(const ok_path_t *path);
 
@@ -322,11 +325,11 @@ size_t ok_subpath_last_element_index(const ok_path_t *path, size_t subpath_index
 bool ok_subpath_is_flat(const ok_path_t *path, size_t subpath_index);
 
 /**
-* Checks if a subpath is closed (the last element is of type #OK_PATH_CLOSE).
-* @param path The path.
-* @param subpath_index The subpath index, from `0` to `count-1`, where `count` is the value
-*     returned from #ok_subpath_count.
-*/
+ * Checks if a subpath is closed (the last element is of type #OK_PATH_CLOSE).
+ * @param path The path.
+ * @param subpath_index The subpath index, from `0` to `count-1`, where `count` is the value
+ *     returned from #ok_subpath_count.
+ */
 bool ok_subpath_is_closed(const ok_path_t *path, size_t subpath_index);
 
 // MARK: Motion paths
