@@ -1015,13 +1015,24 @@ static size_t _ok_path_flatten_curve(double flatness,
     return num_segments1 + num_segments2 + num_segments3 + num_segments4;
 }
 
-static size_t _ok_path_flatten_generic(const ok_path_t *path, size_t first_subpath,
-                                       size_t last_subpath, bool close_subpaths,
+static size_t _ok_path_flatten_generic(const ok_path_t *path,
+                                       size_t first_subpath, size_t last_subpath,
+                                       bool normalize_subpaths, bool close_subpaths,
                                        ok_add_point_func add_point, void *userData) {
     size_t count = 0;
     for (size_t subpath_index = first_subpath; subpath_index <= last_subpath; subpath_index++) {
         size_t first_index = ok_subpath_first_element_index(path, subpath_index);
         size_t last_index = ok_subpath_last_element_index(path, subpath_index);
+        
+        double x, y;
+        ok_subpath_origin(path, subpath_index, &x, &y);
+
+        if (normalize_subpaths && (path->elements.values + first_index)->type != OK_PATH_MOVE_TO) {
+            if (add_point) {
+                add_point(OK_PATH_MOVE_TO, x, y, userData);
+            }
+            count++;
+        }
 
         if (ok_subpath_is_flat(path, subpath_index)) {
             if (add_point) {
@@ -1032,9 +1043,6 @@ static size_t _ok_path_flatten_generic(const ok_path_t *path, size_t first_subpa
             }
             count += last_index - first_index + 1;
         } else {
-            double x = 0.0;
-            double y = 0.0;
-            
             for (size_t i = first_index; i <= last_index; i++) {
                 struct ok_path_element *element = &path->elements.values[i];
                 if (element->type == OK_PATH_QUAD_CURVE_TO) {
@@ -1085,14 +1093,14 @@ static void _ok_path_add_point(enum ok_path_element_type type, double x, double 
 
 static ok_path_t *_ok_path_flatten(const ok_path_t *path, size_t first_subpath,
                                    size_t last_subpath, bool close_subpaths) {
-    size_t count = _ok_path_flatten_generic(path, first_subpath, last_subpath, close_subpaths,
-                                            NULL, NULL);
+    size_t count = _ok_path_flatten_generic(path, first_subpath, last_subpath, false,
+                                            close_subpaths, NULL, NULL);
     ok_path_t *flattened_path = ok_path_create_with_flatness(path->flatness);
     if (!vector_ensure_capacity(&flattened_path->elements, count)) {
         ok_path_free(flattened_path);
         return NULL;
     } else {
-        _ok_path_flatten_generic(path, first_subpath, last_subpath, close_subpaths,
+        _ok_path_flatten_generic(path, first_subpath, last_subpath, false, close_subpaths,
                                  _ok_path_add_point, flattened_path);
         return flattened_path;
     }
@@ -1178,13 +1186,14 @@ static void _ok_motion_path_add_point(enum ok_path_element_type type, double x, 
 ok_motion_path_t *ok_motion_path_create(const ok_path_t *path) {
     size_t first_subpath = 0;
     size_t last_subpath = path->subpaths.length - 1;
-    size_t count = _ok_path_flatten_generic(path, first_subpath, last_subpath, false, NULL, NULL);
+    size_t count = _ok_path_flatten_generic(path, first_subpath, last_subpath, true, false,
+                                            NULL, NULL);
     ok_motion_path_t *out_path = calloc(1, sizeof(ok_motion_path_t));
     if (!vector_ensure_capacity(&out_path->segments, count)) {
         ok_motion_path_free(out_path);
         return NULL;
     } else {
-        _ok_path_flatten_generic(path, first_subpath, last_subpath, false,
+        _ok_path_flatten_generic(path, first_subpath, last_subpath, true, false,
                                  _ok_motion_path_add_point, out_path);
         return out_path;
     }
@@ -1388,8 +1397,8 @@ void ok_path_create_pslg_generic(const ok_path_t *path, bool close_subpaths, siz
     context.segments = NULL;
     context.num_points = 0;
     context.num_segments = 0;
-    context.max_points = _ok_path_flatten_generic(path, first_subpath, last_subpath, close_subpaths,
-                                                  NULL, NULL);
+    context.max_points = _ok_path_flatten_generic(path, first_subpath, last_subpath,
+                                                  true, close_subpaths, NULL, NULL);
     context.max_segments = MIN((context.max_points - 1), (((size_t)1) << (index_size * 8 - 1)));
 
     // Allocate
@@ -1406,7 +1415,7 @@ void ok_path_create_pslg_generic(const ok_path_t *path, bool close_subpaths, siz
     }
 
     // Convert
-    _ok_path_flatten_generic(path, first_subpath, last_subpath, close_subpaths,
+    _ok_path_flatten_generic(path, first_subpath, last_subpath, true, close_subpaths,
                              _ok_pslg_add_point, &context);
     *out_points = context.points;
     *out_num_points = context.num_points;
