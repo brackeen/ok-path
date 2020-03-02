@@ -266,6 +266,75 @@ static int test_motion_path() {
     return 0;
 }
 
+static int test_point_list() {
+    ok_path_t *path1 = ok_path_create();
+    ok_path_t *path2 = ok_path_create();
+
+    char *error;
+    if (!ok_path_append_svg(path1, svg_path, &error)) {
+        printf("Failure: %s: SVG parse error: %s\n", error, __func__);
+        ok_path_free(path1);
+        ok_path_free(path2);
+        return 1;
+    }
+    ok_path_t *path1_flattened = ok_path_flatten(path1);
+
+    // Plain double[2] array test
+    for (size_t i = 0; i < ok_subpath_count(path1); i++) {
+        double (*points)[2];
+        size_t num_points;
+        ok_subpath_create_point_list(path1, i, &points, &num_points);
+        ok_path_append_lines(path2, OK_PATH_MOVE_TO, points, num_points);
+        free(points);
+    }
+    if (!ok_path_equals(path1_flattened, path2)) {
+        printf("Failure: %s: point list\n", __func__);
+        ok_path_free(path1_flattened);
+        ok_path_free(path1);
+        ok_path_free(path2);
+        return 1;
+    }
+    
+    // Cleanup
+    ok_path_free(path2);
+    path2 = ok_path_create();
+    
+    // Specialized test
+    struct my_point {
+        int random_data1[3];
+        double x;
+        double y;
+        int random_data2[8];
+    };
+    for (size_t i = 0; i < ok_subpath_count(path1); i++) {
+        struct my_point *points;
+        size_t num_points;
+        ok_subpath_create_point_list_generic(path1, i, offsetof(struct my_point, x),
+                                             sizeof(struct my_point),
+                                             (void **)&points, &num_points);
+        if (num_points > 0) {
+            ok_path_move_to(path2, points[0].x, points[0].y);
+        }
+        for (size_t j = 1; j < num_points; j++) {
+            ok_path_line_to(path2, points[j].x, points[j].y);
+        }
+        free(points);
+    }
+    if (!ok_path_equals(path1_flattened, path2)) {
+        printf("Failure: %s: point list\n", __func__);
+        ok_path_free(path1_flattened);
+        ok_path_free(path1);
+        ok_path_free(path2);
+        return 1;
+    }
+
+    printf("Success: %s\n", __func__);
+    ok_path_free(path1_flattened);
+    ok_path_free(path1);
+    ok_path_free(path2);
+    return 0;
+}
+
 static int test_pslg() {
     ok_path_t *path1 = ok_path_create();
     ok_path_t *path2 = ok_path_create();
@@ -305,5 +374,5 @@ static int test_pslg() {
 
 int main() {
     return (test_svg_parse() || test_iteration() || test_append_lines() || test_flatten() ||
-            test_subpath() || test_motion_path() || test_pslg());
+            test_subpath() || test_motion_path() || test_point_list() || test_pslg());
 }

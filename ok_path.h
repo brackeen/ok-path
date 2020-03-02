@@ -343,6 +343,45 @@ bool ok_subpath_is_flat(const ok_path_t *path, size_t subpath_index);
  */
 bool ok_subpath_is_closed(const ok_path_t *path, size_t subpath_index);
 
+/**
+ * Converts a subpath to a point list, flattening if needed. Consecutive duplicate points are not included.
+ *
+ * This function returns a newly allocated array of points that should be freed by the caller.
+ *
+ * @param path The path.
+ * @param subpath_index The subpath index, from `0` to `count-1`, where `count` is the value
+ *     returned from #ok_subpath_count.
+ * @param stride The number of bytes from the start of one point to another. The stride must be at least
+ *     `sizeof(double[2]) + offset` bytes.
+ * @param[out] out_points The location to return a newly allocated array of points. The length of
+ *     the array will be `out_num_points * stride`. The array should be freed by the
+ *     caller.
+ * @param[out] out_num_points The number of points returned.
+ *     If the `stride` value is invalid, this value is zero.
+ */
+void ok_subpath_create_point_list_generic(const ok_path_t *path, size_t subpath_index,
+                                          size_t offset, size_t stride,
+                                          void **out_points, size_t *out_num_points);
+
+/**
+ * Converts a subpath to a point list, flattening if needed. Consecutive duplicate points are not included.
+ *
+ * This function returns a newly allocated array of points that should be freed by the caller.
+ *
+ * @param path The path.
+ * @param subpath_index The subpath index, from `0` to `count-1`, where `count` is the value
+ *     returned from #ok_subpath_count.
+ * @param[out] out_points The location to return a newly allocated array of points. The length of
+ *     the array will be `out_num_points * sizeof(double[2])`. The array should be freed by the
+ *     caller.
+ * @param[out] out_num_points The number of points returned.
+ */
+static inline void ok_subpath_create_point_list(const ok_path_t *path, size_t subpath_index,
+                                                double (**out_points)[2], size_t *out_num_points) {
+    ok_subpath_create_point_list_generic(path, subpath_index, 0, sizeof(double[2]),
+                                         (void **)out_points, out_num_points);
+}
+
 // MARK: Motion paths
 
 /**

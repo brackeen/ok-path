@@ -1125,6 +1125,57 @@ ok_path_t *ok_subpath_flatten(const ok_path_t *path, size_t subpath_index) {
     }
 }
 
+struct ok_point_list_context {
+    void *buffer;
+    size_t offset;
+    size_t stride;
+    size_t count;
+};
+
+static void _ok_subpath_add_point_to_list(enum ok_path_element_type type, double x, double y,
+                                          void *userData) {
+    struct ok_point_list_context *context = userData;
+    double point[2] = { x, y };
+    size_t offset = context->offset + context->stride * context->count;
+    if (context->count > 0) {
+        // Don't add duplicate points
+        void *prev_point = (uint8_t *)context->buffer + (offset - context->stride);
+        if (memcmp(point, prev_point, sizeof(point)) == 0) {
+            return;
+        }
+    }
+    void *dst = (uint8_t *)context->buffer + offset;
+    memcpy(dst, point, sizeof(point));
+    context->count++;
+}
+
+void ok_subpath_create_point_list_generic(const ok_path_t *path, size_t subpath_index,
+                                          size_t offset, size_t stride,
+                                          void **out_points, size_t *out_num_points) {
+    if (stride < offset + sizeof(double[2])) {
+        *out_points = NULL;
+        *out_num_points = 0;
+        return;
+    }
+    size_t count = _ok_path_flatten_generic(path, subpath_index, subpath_index, true, false,
+                                            NULL, NULL);
+    void *buffer = malloc(count * stride);
+    if (!buffer) {
+        *out_points = NULL;
+        *out_num_points = count;
+        return;
+    }
+    struct ok_point_list_context context = {
+        .buffer = buffer, .offset = offset, .stride = stride, .count = 0 };
+    _ok_path_flatten_generic(path, subpath_index, subpath_index, true, false,
+                             _ok_subpath_add_point_to_list, &context);
+    
+    // NOTE: This would be a waste of memory if the path has many consecutive duplicate points.
+    // However, this is an unlikely scenario.
+    *out_points = buffer;
+    *out_num_points = context.count;
+}
+
 // MARK: Motion Paths
 
 struct ok_motion_path_segment {
