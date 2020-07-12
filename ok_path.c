@@ -1134,6 +1134,7 @@ struct ok_point_list_context {
 
 static void _ok_subpath_add_point_to_list(enum ok_path_element_type type, double x, double y,
                                           void *userData) {
+    (void)type;
     struct ok_point_list_context *context = userData;
     double point[2] = { x, y };
     size_t offset = context->offset + context->stride * context->count;
