@@ -260,7 +260,7 @@ ok_path_t *ok_subpath_create(const ok_path_t *path, size_t subpath_index) {
     ok_path_t *new_path = ok_path_create_with_flatness(path->flatness);
     const struct ok_subpath *subpath = vector_at(&path->subpaths, subpath_index);
     size_t count = subpath->last_index - subpath->first_index + 1;
-    if (vector_ensure_capacity(&new_path->elements, count)) {
+    if (count > 0 && vector_ensure_capacity(&new_path->elements, count)) {
         struct ok_path_element *src_values = path->elements.values + subpath->first_index;
         struct ok_path_element *dst_values = new_path->elements.values;
         memcpy(dst_values, src_values, count * sizeof(struct ok_path_element));
@@ -595,7 +595,7 @@ static char OK_PATH_SVG_ERROR_MESSAGE[80];
 
 bool ok_path_append_svg(ok_path_t *path, const char *svg_path, char **out_error_message) {
     const char *str = svg_path;
-    double values[7];
+    double values[7] = { 0 };
     char last_command = 0;
     unsigned int last_values_required = 0;
     bool last_control_set = false;
@@ -635,7 +635,7 @@ bool ok_path_append_svg(ok_path_t *path, const char *svg_path, char **out_error_
                         values[count++] = strtod(str, &endptr);
                         if (str == endptr) {
                             ok_path_error(out_error_message,
-                                          "Could not parse number at: %li", str - svg_path);
+                                          "Could not parse number at: %li", (long)(str - svg_path));
                             return false;
                         }
                         str = endptr;
@@ -816,7 +816,7 @@ bool ok_path_append_svg(ok_path_t *path, const char *svg_path, char **out_error_
                 }
                 default: {
                     ok_path_error(out_error_message, "Invalid SVG command %c at position %li",
-                                  command, (str - svg_path));
+                                  command, (long)(str - svg_path));
                     return false;
                 }
             }
@@ -1505,8 +1505,8 @@ void ok_path_append_pslg_generic(ok_path_t *path, size_t index_size, const float
             }
             case 8: {
                 const uint64_t *segments64 = segments;
-                p1 = segments64[i * 2];
-                p2 = segments64[i * 2 + 1];
+                p1 = (size_t)segments64[i * 2];
+                p2 = (size_t)segments64[i * 2 + 1];
                 break;
             }
         }
